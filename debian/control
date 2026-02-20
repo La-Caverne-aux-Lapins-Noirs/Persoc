@@ -5,7 +5,7 @@ Build-Depends: debhelper-compat (= 13), php-cli, liblapin-utils
 Standards-Version: 4.6.2
 
 Package: persoc
-Section: libdevel
+Section: admin
 Architecture: all
 Depends: ${misc:Depends}, php-cli, openssh-client, nftables, iproute2, procps, systemd, bsdutils, liblapin-utils
 Description: Session utils.

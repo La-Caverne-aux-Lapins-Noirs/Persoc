@@ -1,2 +1,3 @@
-src/* opt/persoc/
+src/* usr/lib/persoc/
 persoc.dab etc/persoc/
+persoc usr/libexec/

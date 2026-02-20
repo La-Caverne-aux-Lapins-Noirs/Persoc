@@ -1,0 +1,14 @@
+#!/usr/bin/php
+<?php
+if (file_exists(__DIR__."/src/persoc.php"))
+{
+    define("DEBUG", 1);
+    require_once (__DIR__."/src/persoc.php");
+}
+else
+{
+    define("DEBUG", 0);
+    require_once ("/usr/lib/persoc/persoc.php");
+}
+
+

@@ -4,7 +4,7 @@ Description=Persoc
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/bin/php /opt/persoc/persoc.php
+ExecStart=/usr/bin/php /usr/libexec/persoc
 Restart=always
 
 [Install]
