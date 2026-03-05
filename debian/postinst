@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure)
+	install -d -m 0755 -o root -g root /etc/persoc/conf.d
+	;;
+esac
+
+exit 0
