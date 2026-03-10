@@ -33,6 +33,7 @@ function persoc_log(string $msg): void
 	    "mac" => $Configuration["Mac"],
 	    "message" => $msg,
 	]);
+    file_put_contents("/var/log/persoc/persoc.log", $msg, FILE_APPEND);
     fwrite(STDERR, $msg);
 }
 
