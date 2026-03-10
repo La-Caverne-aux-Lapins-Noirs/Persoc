@@ -79,10 +79,9 @@ function hand_packet(array $data, int $chunkSize = 2048, string $tmpDir = "/tmp"
 function send_data(
     string $host,
     array $data,
-    string $sshUser = "infosphere_hand",
+    string $sshUser = "distrans",
     int $port = 4422,
     string $identityFile = "/root/.ssh/ihk",
-    string $remoteCommand = "infosphere_hand"
 ): ?array
 {
     $ship = hand_packet($data);
@@ -99,14 +98,16 @@ function send_data(
     // Using UserKnownHostsFile=/dev/null avoids writing to known_hosts.
     $args = [
         "ssh",
-        "-o", "StrictHostKeyChecking=no",
-        "-o", "UserKnownHostsFile=/dev/null",
-        "-o", "LogLevel=ERROR",
-        "-i", $identityFile,
+	"-T",
+	"-i", $identityFile,
         "-p", (string)$port,
-        "-tt",
-        $sshUser . "@" . $host,
-        $remoteCommand,
+	"-o", "RequestTTY=no",
+	"-o", "BatchMode=yes",
+	"-o", "IdentitiesOnly=yes",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "LogLevel=ERROR",
+        $sshUser . "@" . $host
     ];
 
     // Build a single command string with escapeshellarg

@@ -31,7 +31,7 @@ install_mock_nft($bin, $nftLog);
 
 global $Configuration;
 $Configuration = [
-    "InfosphereHand" => "ih.test",
+    "Distrans" => "ih.test",
     "Deadlist" => $tmp . "/deadlist.csv",
 ];
 

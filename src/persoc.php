@@ -15,20 +15,30 @@ require_once (__DIR__."/tools/send_data.php");
 require_once (__DIR__."/users/expell_intruders.php");
 require_once (__DIR__."/users/log_activity.php");
 
+$Configuration = null;
+
 // -----------------------------------------------------------------------------
 // Logging
 // -----------------------------------------------------------------------------
 
 function persoc_log(string $msg): void
 {
-    fwrite(STDERR, "[" . date("Y-m-d H:i:s") . "] persoc: " . $msg . "\n");
+    global $Configuration;
+    
+    $msg = "[".date("Y-m-d H:i:s")."] persoc: $msg\n";
+    if (@$Configuration["Distrans"])
+	send_data($Configuration["Distrans"], [
+	    "command" => "persoc_log",
+	    "ip" => $Configuration["IP"],
+	    "mac" => $Configuration["Mac"],
+	    "message" => $msg,
+	]);
+    fwrite(STDERR, $msg);
 }
 
 // -----------------------------------------------------------------------------
 // Configuration
 // -----------------------------------------------------------------------------
-
-$Configuration = null;
 
 function load_configuration(string $conf_file = ""): array
 {
@@ -49,16 +59,16 @@ function load_configuration(string $conf_file = ""): array
         throw new RuntimeException("cannot load configuration via mergeconf");
 
     // Mandatory fields
-    foreach (["InfosphereHand", "NFS", "LDAP"] as $k)
+    foreach (["Distrans"] as $k)
     {
         if (!array_key_exists($k, $conf))
             throw new RuntimeException("missing configuration field: " . $k);
     }
-    if (!is_string($conf["InfosphereHand"]) || trim($conf["InfosphereHand"]) === "")
-        throw new RuntimeException("InfosphereHand must be a non-empty string");
+    if (!is_string($conf["Distrans"]) || trim($conf["Distrans"]) === "")
+        throw new RuntimeException("Distrans must be a non-empty string");
 
-    // Normalize allowlists (NFS/LDAP mandatory, CUSTOM optional)
-    foreach (["NFS", "LDAP", "CUSTOM"] as $k)
+    // Normalize allowlists
+    foreach (["Distrans", "Custom"] as $k)
     {
         if (!array_key_exists($k, $conf))
         {
@@ -82,7 +92,7 @@ function load_configuration(string $conf_file = ""): array
         }
         $conf[$k] = array_values(array_unique($out));
 
-        if (($k === "NFS" || $k === "LDAP") && count($conf[$k]) === 0)
+        if ($k === "Distrans" && count($conf[$k]) === 0)
             throw new RuntimeException("$k must not be empty");
     }
 
@@ -104,6 +114,12 @@ function load_configuration(string $conf_file = ""): array
     $conf["Intervals"]["Intruders"] = max(1, (int)$conf["Intervals"]["Intruders"]);
     $conf["Intervals"]["Deadlist"]  = max(0, (int)$conf["Intervals"]["Deadlist"]);
 
+    $iface = trim(shell_exec("ip route get 8.8.8.8 | awk '{print \$5; exit}'"));
+    $ip = trim(shell_exec("ip -4 addr show $iface | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'"));
+    $mac = trim(shell_exec("cat /sys/class/net/$iface/address"));
+    $conf["IP"] = $ip;
+    $conf["Mac"] = $mac;
+    
     return $conf;
 }
 

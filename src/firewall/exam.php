@@ -3,7 +3,7 @@
 /**
  * Exam firewall:
  * - If $enabled === true: for users that currently have an X session, block ALL outbound traffic
- *   except destinations listed in $Configuration['NFS'], ['LDAP'], ['CUSTOM'].
+ *   except destinations listed in $Configuration['Distrans'], ['Custom'].
  * - If $enabled === false: remove the exam jump rule (disables exam filtering).
  *
  * Notes:
@@ -12,9 +12,7 @@
  * - “X users” detection
  *
  * $Configuration expected shape (values may be string or array of strings):
- *   $Configuration['NFS']    = ["nfs.server.local", "192.168.10.0/24", ...]
- *   $Configuration['LDAP']   = ["ldap.server.local", "192.168.10.5", ...]
- *   $Configuration['CUSTOM'] = ["repo.school.local", ...]
+ *   $Configuration['Custom'] = ["repo.school.local", ...]
  *
  */
 function firewall_exam(bool $enabled): array
@@ -195,10 +193,9 @@ function firewall_exam(bool $enabled): array
 
     // ---- config -> allowed targets ----
 
-    $nfs    = $normalize_list($Configuration["NFS"]    ?? null);
-    $ldap   = $normalize_list($Configuration["LDAP"]   ?? null);
-    $custom = $normalize_list($Configuration["CUSTOM"] ?? null);
-    $targets = array_values(array_unique(array_filter(array_merge($nfs, $ldap, $custom), fn($x) => $x !== "")));
+    $distrans    = $normalize_list($Configuration["Distrans"]    ?? null);
+    $custom = $normalize_list($Configuration["Custom"] ?? null);
+    $targets = array_values(array_unique(array_filter(array_merge($distrans, $custom), fn($x) => $x !== "")));
 
     // ---- ensure base nft structure ----
     $nft("nft add table inet filter 2>/dev/null || true", $r0);

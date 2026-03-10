@@ -40,8 +40,8 @@ assert_true(is_array($args) && count($args) >= 1, "ssh mock was not invoked");
 
 // Check that destination contains user@host and remote command
 $joined = implode("\n", $args);
-assert_contains($joined, "infosphere_hand@example.test", "ssh destination missing");
-assert_contains($joined, "|infosphere_hand", "remote command missing");
+assert_contains($joined, "distrans@example.test", "ssh destination missing");
+assert_contains($joined, "|distrans", "remote command missing");
 
 // Assert stdin contains our packet structure (JSON + \v ... stop\v)
 $stdin = file_exists($stdinDump) ? file_get_contents($stdinDump) : "";

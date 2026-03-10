@@ -29,9 +29,8 @@ assert_true(function_exists("firewall_exam"), "firewall_exam() not defined after
 // Provide configuration: allowed endpoints must pass
 global $Configuration;
 $Configuration = [
-    "NFS" => ["10.10.0.10"],      // already IP => deterministic
-    "LDAP" => ["10.10.0.20"],
-    "CUSTOM" => ["10.10.0.30"],
+    "Distrans" => ["10.10.0.10"],      // already IP => deterministic
+    "Custom" => ["10.10.0.30"],
 ];
 
 $tmp = mk_tmp_dir("persoc_unit_firewall_exam");
@@ -76,9 +75,8 @@ assert_contains($joined, "1001", "UID 1001 (alice) not present in nft calls");
 assert_true(strpos($joined, "|1002") === false, "UID 1002 (bob) should not be present (not graphical)");
 
 // Allowed IPs should be inserted
-assert_contains($joined, "10.10.0.10", "NFS allowed IP missing");
-assert_contains($joined, "10.10.0.20", "LDAP allowed IP missing");
-assert_contains($joined, "10.10.0.30", "CUSTOM allowed IP missing");
+assert_contains($joined, "10.10.0.10", "Distrans allowed IP missing");
+assert_contains($joined, "10.10.0.30", "Custom allowed IP missing");
 
 // Ensure the drop rule for exam users is installed
 assert_true(nft_calls_has($calls, '/^nft\|add\|rule\|inet\|filter\|exam_out\|meta\|skuid\|@exam_uids\|drop\b/'),

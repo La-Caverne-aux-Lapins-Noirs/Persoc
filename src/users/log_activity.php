@@ -6,7 +6,7 @@ declare(strict_types=1);
  *
  * Requires:
  * - send_data() + hand_packet() available (e.g. require src/hand/send_data.php)
- * - global $Configuration["InfosphereHand"] set to the IH host
+ * - global $Configuration["Distrans"] set to the IH host
  */
 
 function persoc_parse_duration(string $idle): int
@@ -192,7 +192,7 @@ function persoc_get_machine_type(): string
 
 /**
  * Main function: sends the packet to IH log_activity.
- * No params: host is $Configuration["InfosphereHand"].
+ * No params: host is $Configuration["Distrans"].
  *
  * @return array|null decoded JSON from IH (send_data semantics)
  */
@@ -200,7 +200,7 @@ function users_log_activity(): ?array
 {
     global $Configuration;
 
-    if (!isset($Configuration["InfosphereHand"]) || !is_string($Configuration["InfosphereHand"]) || trim($Configuration["InfosphereHand"]) === "")
+    if (!isset($Configuration["Distrans"]) || !is_string($Configuration["Distrans"]) || trim($Configuration["Distrans"]) === "")
         return null;
 
     $id = persoc_get_net_identity();
@@ -222,5 +222,5 @@ function users_log_activity(): ?array
         "users" => persoc_users_get_activity(),
     ];
 
-    return send_data($Configuration["InfosphereHand"], $packet);
+    return send_data($Configuration["Distrans"], $packet);
 }

@@ -12,10 +12,8 @@
 ]
 
 LocalUser = "technocore"
-InfosphereHand = "192.168.200.1"
-NFS = "192.168.200.1"
-LDAP = "192.168.200.1"
-CUSTOM = "192.168.200.1"
+Distrans = "192.168.200.1"
+Custom = "192.168.200.1"
 Deadlist = "/etc/persoc/deadlist.csv"
 @include "conf.d/"
 

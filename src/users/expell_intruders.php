@@ -17,7 +17,7 @@ declare(strict_types=1);
  *     broadcast a warning message to ALL graphical users (wall)
  *     but only when current seconds == 00 (to avoid spam).
  *
- * No parameters. Host is in $Configuration["InfosphereHand"].
+ * No parameters. Host is in $Configuration["Distrans"].
  * Needs send_data() available.
  */
 
@@ -194,8 +194,8 @@ function users_expell_intruders(): array
 {
     global $Configuration;
 
-    if (!isset($Configuration["InfosphereHand"]) || !is_string($Configuration["InfosphereHand"]) || trim($Configuration["InfosphereHand"]) === "")
-        return ["ok" => false, "error" => "Configuration.InfosphereHand missing"];
+    if (!isset($Configuration["Distrans"]) || !is_string($Configuration["Distrans"]) || trim($Configuration["Distrans"]) === "")
+        return ["ok" => false, "error" => "Configuration.Distrans missing"];
 
     if (!function_exists("send_data"))
         return ["ok" => false, "error" => "send_data() missing"];
@@ -205,7 +205,7 @@ function users_expell_intruders(): array
         return ["ok" => false, "error" => "cannot determine mac/ip"];
 
     // Ask IH
-    $ans = send_data($Configuration["InfosphereHand"], [
+    $ans = send_data($Configuration["Distrans"], [
         "command" => "is_exam",
         "mac" => $id["mac"],
         "ip" => $id["ip"],

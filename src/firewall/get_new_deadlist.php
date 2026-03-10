@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Fetch the latest deadlist from Infosphere Hand, write it locally, and refresh nft rules via firewall_deadlist().
  *
  * No parameters:
- * - Uses $Configuration["InfosphereHand"] (mandatory)
+ * - Uses $Configuration["Distrans"] (mandatory)
  * - Uses $Configuration["Deadlist"] (mandatory)
  *
  * Expected IH response (tolerant):
@@ -20,11 +20,11 @@ function get_new_deadlist(): array
 {
     global $Configuration;
 
-    $ih = (string)($Configuration["InfosphereHand"] ?? "");
+    $ih = (string)($Configuration["Distrans"] ?? "");
     $dl = (string)($Configuration["Deadlist"] ?? "");
 
     if ($ih === "")
-        return ["ok" => false, "error" => "Configuration.InfosphereHand missing"];
+        return ["ok" => false, "error" => "Configuration.Distrans missing"];
     if ($dl === "")
         return ["ok" => false, "error" => "Configuration.Deadlist missing"];
 

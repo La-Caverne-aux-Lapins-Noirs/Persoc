@@ -21,7 +21,7 @@ $stdinDump = $tmp . "/ssh.stdin.dump";
 
 global $Configuration;
 $Configuration = [
-    "InfosphereHand" => "ih.test",
+    "Distrans" => "ih.test",
 ];
 
 // Mock ssh: returns JSON as last line
@@ -86,7 +86,7 @@ $args = file_exists($argsLog) ? file($argsLog, FILE_IGNORE_NEW_LINES) : [];
 assert_true(is_array($args) && count($args) >= 1, "ssh mock not invoked");
 
 $joinedArgs = implode("\n", $args);
-assert_contains($joinedArgs, "infosphere_hand@ih.test", "ssh destination missing");
+assert_contains($joinedArgs, "distrans@ih.test", "ssh destination missing");
 
 // Verify stdin packet contains required keys for IH log_activity
 $stdin = file_exists($stdinDump) ? file_get_contents($stdinDump) : "";

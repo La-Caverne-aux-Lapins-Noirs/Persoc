@@ -36,7 +36,7 @@ install_mock_wall($bin, $wallLog, $wallStdin);
 
 global $Configuration;
 $Configuration = [
-    "InfosphereHand" => "ih.test",
+    "Distrans" => "ih.test",
 ];
 
 // ---- Scenario 1: exam = true, start_at in 4 min, now seconds == 00 => wall + expel alice ----
