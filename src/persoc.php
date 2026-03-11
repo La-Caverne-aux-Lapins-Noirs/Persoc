@@ -27,8 +27,8 @@ function persoc_log(string $msg): void
     
     $msg = "[".date("Y-m-d H:i:s")."] persoc: $msg\n";
     fwrite(STDERR, $msg);
-    if (@$Configuration["Distrans"][0] && @$Configuration["IP"] && @$Configuration["Mac"])
-	send_data($Configuration["Distrans"][0], [
+    if (@$Configuration["Distrans"] && @$Configuration["IP"] && @$Configuration["Mac"])
+	send_data($Configuration["Distrans"], [
 	    "command" => "persoc_log",
 	    "ip" => $Configuration["IP"],
 	    "mac" => $Configuration["Mac"],
@@ -69,7 +69,7 @@ function load_configuration(string $conf_file = ""): array
         throw new RuntimeException("Distrans must be a non-empty string");
 
     // Normalize allowlists
-    foreach (["Distrans", "Custom"] as $k)
+    foreach (["Custom"] as $k)
     {
         if (!array_key_exists($k, $conf))
         {
@@ -92,9 +92,6 @@ function load_configuration(string $conf_file = ""): array
                 $out[] = $v;
         }
         $conf[$k] = array_values(array_unique($out));
-
-        if ($k === "Distrans" && count($conf[$k]) === 0)
-            throw new RuntimeException("$k must not be empty");
     }
 
     // Optional: deadlist file
