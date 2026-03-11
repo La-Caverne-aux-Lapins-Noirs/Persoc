@@ -187,12 +187,14 @@ try
         if ($deadlistEvery > 0 && $now >= $nextDeadlist)
         {
             $nextDeadlist = $now + $deadlistEvery;
+	    persoc_log("will firewall_deadlist");
             firewall_deadlist($Configuration["Deadlist"]);
         }
 
         if ($now >= $nextActivity)
         {
             $nextActivity = $now + $activityEvery;
+	    persoc_log("will call user_log_activity");
             users_log_activity();
         }
 
@@ -201,6 +203,7 @@ try
             $nextIntruders = $now + $intrudersEvery;
 
             // Ask IH (via users_expell_intruders) and apply exam firewall accordingly
+	    persoc_log("will users_expell_intruders");
             $r = users_expell_intruders();
             $exam = is_array($r) ? (bool)($r["exam"] ?? false) : false;
             firewall_exam($exam);
