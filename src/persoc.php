@@ -26,15 +26,15 @@ function persoc_log(string $msg): void
     global $Configuration;
     
     $msg = "[".date("Y-m-d H:i:s")."] persoc: $msg\n";
-    if (@$Configuration["Distrans"])
-	send_data($Configuration["Distrans"], [
+    fwrite(STDERR, $msg);
+    if (@$Configuration["Distrans"][0] && @$Configuration["IP"] && @$Configuration["Mac"])
+	send_data($Configuration["Distrans"][0], [
 	    "command" => "persoc_log",
 	    "ip" => $Configuration["IP"],
 	    "mac" => $Configuration["Mac"],
 	    "message" => $msg,
 	]);
     file_put_contents("/var/log/persoc/persoc.log", $msg, FILE_APPEND);
-    fwrite(STDERR, $msg);
 }
 
 // -----------------------------------------------------------------------------
@@ -50,7 +50,7 @@ function load_configuration(string $conf_file = ""): array
         else if (isset($_SERVER["HOME"]) && file_exists($_SERVER["HOME"] . "/persoc.dab"))
             $conf_file = $_SERVER["HOME"] . "/persoc.dab";
         else
-            $conf_file = "/etc/persoc/persoc.dab /etc/persoc/confs.d/*";
+            $conf_file = "/etc/persoc/persoc.dab";
     }
 
     $conf_file = escapeshellarg($conf_file);
@@ -193,7 +193,7 @@ try
         if ($now >= $nextActivity)
         {
             $nextActivity = $now + $activityEvery;
-            persoc_send_log_activity();
+            users_log_activity();
         }
 
         if ($now >= $nextIntruders)
@@ -207,6 +207,7 @@ try
         }
 
         sleep($tick);
+	persoc_log("tick.");
     }
 
     persoc_log("stopping.");

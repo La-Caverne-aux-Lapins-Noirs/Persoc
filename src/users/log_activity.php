@@ -222,5 +222,6 @@ function users_log_activity(): ?array
         "users" => persoc_users_get_activity(),
     ];
 
+    persoc_log("sending user log to distrans.");
     return send_data($Configuration["Distrans"], $packet);
 }
