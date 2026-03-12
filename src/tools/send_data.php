@@ -36,7 +36,6 @@ function send_data(
 ): ?array
 {
     $stdin = hand_packet($data);
-    persoc_log($stdin);
 
     $args = [
         "ssh",
@@ -93,6 +92,7 @@ function send_data(
     }
 
     $decoded = json_decode($out, true);
+    persoc_log("distrans answered $out", true);
     if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
         return null;
     }
