@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /**
- * Fetch the latest deadlist from Infosphere Hand, write it locally, and refresh nft rules via firewall_deadlist().
+ * Fetch the latest deadlist from Distrans, write it locally, and refresh nft rules via firewall_deadlist().
  *
  * No parameters:
  * - Uses $Configuration["Distrans"] (mandatory)
@@ -28,13 +28,13 @@ function get_new_deadlist(): array
     if ($dl === "")
         return ["ok" => false, "error" => "Configuration.Deadlist missing"];
 
-    // Ask Infosphere Hand
+    // Ask Distrans
     $ans = send_data($ih, ["command" => "get_deadlist"]);
     if (!is_array($ans))
-        return ["ok" => false, "error" => "invalid response from infosphere_hand"];
+        return ["ok" => false, "error" => "invalid response from distrans"];
 
     if (($ans["ok"] ?? null) !== true && ($ans["result"] ?? null) !== "ok")
-        return ["ok" => false, "error" => "infosphere_hand returned error", "response" => $ans];
+        return ["ok" => false, "error" => "distrans returned error", "response" => $ans];
 
     // Build CSV content
     $csv = null;
@@ -58,7 +58,7 @@ function get_new_deadlist(): array
     }
 
     if (!is_string($csv))
-        return ["ok" => false, "error" => "missing deadlist content in IH response", "response" => $ans];
+        return ["ok" => false, "error" => "missing deadlist content in distrans response", "response" => $ans];
 
     // Atomic-ish write: write temp then rename
     $dir = dirname($dl);

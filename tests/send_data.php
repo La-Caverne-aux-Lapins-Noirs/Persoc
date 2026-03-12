@@ -24,7 +24,27 @@ $expected = ["ok" => true, "answer" => 42];
 $finalJson = json_encode($expected, JSON_UNESCAPED_UNICODE);
 assert_true(is_string($finalJson), "json_encode failed in test");
 
-install_mock_ssh($bin, $argsLog, $stdinDump, $finalJson);
+@mkdir($bin, 0755, true);
+
+$argsLogEsc = str_replace("'", "'\"'\"'", $argsLog);
+$stdinEsc = str_replace("'", "'\"'\"'", $stdinDump);
+$finalJsonEsc = str_replace("'", "'\"'\"'", $finalJson);
+
+$mockSsh = <<<SH
+#!/bin/sh
+out="ssh"
+for a in "\$@"; do
+  out="\$out|\$a"
+done
+echo "\$out" >> '$argsLogEsc'
+
+cat > '$stdinEsc'
+
+printf '%s' '$finalJsonEsc'
+exit 0
+SH;
+
+install_mock_cmd($bin, "ssh", $mockSsh);
 
 $res = with_path_prefix($bin, function() {
     $data = ["command" => "ping", "x" => 1, "y" => "é"];
@@ -32,18 +52,17 @@ $res = with_path_prefix($bin, function() {
 });
 
 assert_true(is_array($res), "send_data() should return array");
-assert_eq($res, $expected, "send_data() should decode last JSON line");
+assert_eq($res, $expected, "send_data() should decode a single JSON stdout payload");
 
 // Assert ssh was called
 $args = file_exists($argsLog) ? file($argsLog, FILE_IGNORE_NEW_LINES) : [];
 assert_true(is_array($args) && count($args) >= 1, "ssh mock was not invoked");
 
-// Check that destination contains user@host and remote command
+// Check destination
 $joined = implode("\n", $args);
 assert_contains($joined, "distrans@example.test", "ssh destination missing");
-assert_contains($joined, "|distrans", "remote command missing");
 
-// Assert stdin contains our packet structure (JSON + \v ... stop\v)
+// Assert stdin contains our packet structure (JSON + \\v ... stop\\v)
 $stdin = file_exists($stdinDump) ? file_get_contents($stdinDump) : "";
 assert_true(is_string($stdin) && $stdin !== "", "ssh stdin was not dumped");
 assert_contains($stdin, "\"command\":\"ping\"", "stdin JSON missing command");
@@ -51,5 +70,5 @@ assert_contains($stdin, "\v", "stdin missing vertical-tab separator");
 assert_contains($stdin, "stop\v", "stdin missing stop marker");
 
 rm_rf($tmp);
-fwrite(STDOUT, "OK ".basename(__FILE__)."\n");
+fwrite(STDOUT, "OK " . basename(__FILE__) . "\n");
 exit(0);

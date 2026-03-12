@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /*
- * Persoc -> Infosphere Hand: send activity packet for log_activity command.
+ * Persoc -> Distrans: send activity packet for log_activity command.
  *
  * Requires:
  * - send_data() + hand_packet() available (e.g. require src/hand/send_data.php)

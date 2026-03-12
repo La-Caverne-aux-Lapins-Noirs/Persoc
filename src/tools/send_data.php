@@ -2,16 +2,13 @@
 declare(strict_types=1);
 
 /**
- * Build a packet file for Infosphere Hand:
+ * Build a packet payload for Distrans:
  * - JSON (unicode unescaped) + "\v"
- * - split into chunks (2048)
+ * - split into chunks
  * - join with "\n"
  * - append "stop\v\n"
- * - write to a temp file with mode 0600
- *
- * @return string absolute path to the temp file
  */
-function hand_packet(array $data, int $chunkSize = 2048, string $tmpDir = "/tmp"): string
+function hand_packet(array $data, int $chunkSize = 2048): string
 {
     if ($chunkSize <= 0) {
         $chunkSize = 2048;
@@ -19,7 +16,6 @@ function hand_packet(array $data, int $chunkSize = 2048, string $tmpDir = "/tmp"
 
     $payload = json_encode($data, JSON_UNESCAPED_UNICODE);
     if (!is_string($payload)) {
-        // Extremely rare: json_encode failure
         $payload = "{}";
     }
 
@@ -27,55 +23,10 @@ function hand_packet(array $data, int $chunkSize = 2048, string $tmpDir = "/tmp"
 
     $chunks = str_split($payload, $chunkSize);
     $chunks[] = "stop\v\n";
-    $final = implode("\n", $chunks);
 
-    $tmpDir = rtrim($tmpDir, "/");
-    if ($tmpDir === "") {
-        $tmpDir = "/tmp";
-    }
-
-    // Create a unique file path
-    $ship = $tmpDir . "/.wsidle_msg_" . bin2hex(random_bytes(12));
-
-    // Create file and set permissions early
-    $oldUmask = umask(0077);
-    $ok = @file_put_contents($ship, "");
-    umask($oldUmask);
-
-    if ($ok === false) {
-        // fallback to /tmp if user provided a non-writable directory
-        $ship = "/tmp/.wsidle_msg_" . bin2hex(random_bytes(12));
-        $oldUmask = umask(0077);
-        $ok = @file_put_contents($ship, "");
-        umask($oldUmask);
-
-        if ($ok === false) {
-            // Last resort: let it fail loudly
-            throw new RuntimeException("hand_packet: cannot create temp file");
-        }
-    }
-
-    @chmod($ship, 0600);
-
-    $ok2 = @file_put_contents($ship, $final);
-    if ($ok2 === false) {
-        @unlink($ship);
-        throw new RuntimeException("hand_packet: cannot write temp file");
-    }
-
-    return $ship;
+    return implode("\n", $chunks);
 }
 
-/**
- * Send data to Infosphere Hand over ssh, return decoded JSON from last line of stdout.
- *
- * Differences vs legacy:
- * - no shell pipeline, no inline rm (we unlink in PHP)
- * - safer argument escaping by using proc_open argv string built from fixed flags + escapeshellarg
- * - still returns json_decode(last_line, true)
- *
- * @return array|null decoded JSON object/array, or null if not decodable
- */
 function send_data(
     string $host,
     array $data,
@@ -84,42 +35,32 @@ function send_data(
     string $identityFile = "/root/.ssh/ihk",
 ): ?array
 {
-    $ship = hand_packet($data);
+    $stdin = hand_packet($data);
+    persoc_log($stdin);
 
-    // Read packet to feed to ssh stdin
-    $stdin = @file_get_contents($ship);
-    @unlink($ship);
-
-    if (!is_string($stdin)) {
-        return null;
-    }
-
-    // SSH options (keep behaviour: no strict checking)
-    // Using UserKnownHostsFile=/dev/null avoids writing to known_hosts.
     $args = [
         "ssh",
-	"-T",
-	"-i", $identityFile,
+        "-T",
+        "-i", $identityFile,
         "-p", (string)$port,
-	"-o", "RequestTTY=no",
-	"-o", "BatchMode=yes",
-	"-o", "IdentitiesOnly=yes",
+        "-o", "RequestTTY=no",
+        "-o", "BatchMode=yes",
+        "-o", "IdentitiesOnly=yes",
         "-o", "UserKnownHostsFile=/dev/null",
         "-o", "StrictHostKeyChecking=no",
         "-o", "LogLevel=ERROR",
-        $sshUser . "@" . $host
+        $sshUser . "@" . $host,
     ];
 
-    // Build a single command string with escapeshellarg
     $cmd = "";
-    foreach ($args as $a) {
-        $cmd .= ($cmd === "" ? "" : " ") . escapeshellarg($a);
+    foreach ($args as $arg) {
+        $cmd .= ($cmd === "" ? "" : " ") . escapeshellarg($arg);
     }
 
     $descriptorspec = [
-        0 => ["pipe", "r"], // stdin
-        1 => ["pipe", "w"], // stdout
-        2 => ["pipe", "w"], // stderr (ignored, but drained)
+        0 => ["pipe", "r"],
+        1 => ["pipe", "w"],
+        2 => ["pipe", "w"],
     ];
 
     $proc = @proc_open($cmd, $descriptorspec, $pipes);
@@ -127,39 +68,35 @@ function send_data(
         return null;
     }
 
-    // Feed stdin then close
-    fwrite($pipes[0], $stdin);
+    $writeOk = fwrite($pipes[0], $stdin);
     fclose($pipes[0]);
 
     $out = stream_get_contents($pipes[1]);
     fclose($pipes[1]);
 
-    // Drain stderr to avoid blocking
     $err = stream_get_contents($pipes[2]);
     fclose($pipes[2]);
 
     $exitCode = proc_close($proc);
 
-    if (!is_string($out) || trim($out) === "") {
+    if ($writeOk === false) {
         return null;
     }
 
-    // Legacy: keep last non-empty line
-    $lines = preg_split("/\r?\n/", $out);
-    if (!is_array($lines)) {
+    if (!is_string($out)) {
         return null;
     }
 
-    for ($i = count($lines) - 1; $i >= 0; --$i) {
-        $line = trim((string)$lines[$i]);
-        if ($line === "") continue;
-        $decoded = json_decode($line, true);
-        if (json_last_error() === JSON_ERROR_NONE) {
-            return $decoded;
-        }
-        // If last line is not JSON, legacy would return null-ish; we continue scanning backward
-        // to be tolerant.
+    $out = trim($out);
+    if ($out === "") {
+        return null;
     }
 
-    return null;
+    $decoded = json_decode($out, true);
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+        return null;
+    }
+
+    return $decoded;
 }
+

@@ -1,8 +1,11 @@
 <?php
 declare(strict_types=1);
 
+foreach (glob(__DIR__."/../src/*/*.php") as $file)
+    require_once ($file);
+
 /*
- * Common test helpers for Persoc / Infosphere-Hand style scripts.
+ * Common test helpers for Persoc / Distrans style scripts.
  * Put ALL test tools here as requested.
  */
 
@@ -233,27 +236,21 @@ function install_mock_ssh(string $binDir, string $argsLogFile, string $stdinDump
 {
     @mkdir($binDir, 0755, true);
 
-    // escape single quotes for embedding in sh single quotes
     $finalJsonEsc = str_replace("'", "'\"'\"'", $finalJsonLine);
     $argsLogEsc   = str_replace("'", "'\"'\"'", $argsLogFile);
     $stdinEsc     = str_replace("'", "'\"'\"'", $stdinDumpFile);
 
     $sh = <<<SH
 #!/bin/sh
-# Record argv (one line)
 out="ssh"
 for a in "\$@"; do
   out="\$out|\$a"
 done
 echo "\$out" >> '$argsLogEsc'
 
-# Dump stdin
 cat > '$stdinEsc'
 
-# Simulate some noisy output + final JSON line
-echo "hello"
-echo "world"
-printf '%s\n' '$finalJsonEsc'
+printf '%s' '$finalJsonEsc'
 exit 0
 SH;
 

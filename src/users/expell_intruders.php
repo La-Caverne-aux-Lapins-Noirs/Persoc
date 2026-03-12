@@ -2,17 +2,17 @@
 declare(strict_types=1);
 
 /*
- * Persoc: expel intruders depending on exam mode (Infosphere Hand is_exam).
+ * Persoc: expel intruders depending on exam mode (Distrans is_exam).
  *
  * Rules:
- * - Ask Infosphere Hand if exam mode is on for THIS machine (mac-based room mapping).
+ * - Ask Distrans if exam mode is on for THIS machine (mac-based room mapping).
  * - If exam == true:
  *     close all graphical sessions (x11/wayland) whose username is NOT a.b.exam
  * - If exam == false:
  *     close all graphical sessions (x11/wayland) whose username IS a.b.exam
  *
  * Additional requirement:
- * - Infosphere Hand will provide a "start_at" field (future).
+ * - Distrans will provide a "start_at" field (future).
  * - If exam starts in less than 5 minutes:
  *     broadcast a warning message to ALL graphical users (wall)
  *     but only when current seconds == 00 (to avoid spam).
