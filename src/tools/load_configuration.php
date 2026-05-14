@@ -1,5 +1,51 @@
 <?php
 
+function persoc_configuration_shell_output(string $cmd): string
+{
+    $out = @shell_exec($cmd);
+    return is_string($out) ? $out : "";
+}
+
+function persoc_configuration_detect_network_identity(): array
+{
+    $route = persoc_configuration_shell_output("ip route get 8.8.8.8 2>/dev/null");
+
+    $iface = "";
+    $ip = "";
+    $mac = "";
+
+    if (preg_match('/\bdev\s+([a-zA-Z0-9_.:-]+)\b/', $route, $m) === 1)
+        $iface = $m[1];
+    if (preg_match('/\bsrc\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\b/', $route, $m) === 1)
+        $ip = $m[1];
+
+    if ($iface !== "")
+    {
+        if ($ip === "")
+        {
+            $addr = persoc_configuration_shell_output("ip -4 addr show dev " . escapeshellarg($iface) . " 2>/dev/null");
+            if (preg_match('/\binet\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\//', $addr, $m) === 1)
+                $ip = $m[1];
+        }
+
+        $link = persoc_configuration_shell_output("ip link show dev " . escapeshellarg($iface) . " 2>/dev/null");
+        if (preg_match('/\blink\/ether\s+([0-9a-fA-F:]{17})\b/', $link, $m) === 1)
+            $mac = strtolower($m[1]);
+        if ($mac === "")
+        {
+            $legacy = persoc_configuration_shell_output("cat " . escapeshellarg("/sys/class/net/" . $iface . "/address") . " 2>/dev/null");
+            if (preg_match('/\b([0-9a-fA-F:]{17})\b/', $legacy, $m) === 1)
+                $mac = strtolower($m[1]);
+        }
+    }
+
+    return [
+        "Interface" => $iface,
+        "IP" => $ip,
+        "Mac" => $mac,
+    ];
+}
+
 function load_configuration(string $conf_file = ""): array
 {
     if ($conf_file === "")
@@ -57,6 +103,10 @@ function load_configuration(string $conf_file = ""): array
     if (!isset($conf["Deadlist"]) || !is_string($conf["Deadlist"]) || trim($conf["Deadlist"]) === "")
         $conf["Deadlist"] = "/etc/persoc/deadlist.csv";
 
+    // Optional: log file
+    if (!isset($conf["LogFile"]) || !is_string($conf["LogFile"]) || trim($conf["LogFile"]) === "")
+        $conf["LogFile"] = "/var/log/persoc/persoc.log";
+
     // Intervals defaults are centralized here
     if (!isset($conf["Intervals"]) || !is_array($conf["Intervals"]))
         $conf["Intervals"] = [];
@@ -71,11 +121,10 @@ function load_configuration(string $conf_file = ""): array
     $conf["Intervals"]["Intruders"] = max(1, (int)$conf["Intervals"]["Intruders"]);
     $conf["Intervals"]["Deadlist"]  = max(0, (int)$conf["Intervals"]["Deadlist"]);
 
-    $iface = trim(shell_exec("ip route get 8.8.8.8 | awk '{print \$5; exit}'"));
-    $ip = trim(shell_exec("ip -4 addr show $iface | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'"));
-    $mac = trim(shell_exec("cat /sys/class/net/$iface/address"));
-    $conf["IP"] = $ip;
-    $conf["Mac"] = $mac;
-    
+    $identity = persoc_configuration_detect_network_identity();
+    $conf["Interface"] = $identity["Interface"];
+    $conf["IP"] = $identity["IP"];
+    $conf["Mac"] = $identity["Mac"];
+
     return $conf;
 }

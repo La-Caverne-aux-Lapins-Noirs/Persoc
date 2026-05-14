@@ -4,6 +4,9 @@ declare(strict_types=1);
 foreach (glob(__DIR__."/../src/*/*.php") as $file)
     require_once ($file);
 
+if (getenv("PERSOC_LOG_FILE") === false || getenv("PERSOC_LOG_FILE") === "")
+    putenv("PERSOC_LOG_FILE=" . sys_get_temp_dir() . "/persoc_unit_" . getmypid() . ".log");
+
 /*
  * Common test helpers for Persoc / Distrans style scripts.
  * Put ALL test tools here as requested.

@@ -27,6 +27,33 @@ function hand_packet(array $data, int $chunkSize = 2048): string
     return implode("\n", $chunks);
 }
 
+function persoc_decode_distrans_output(string $out): ?array
+{
+    $out = trim($out);
+    if ($out === "")
+        return null;
+
+    $decoded = json_decode($out, true);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded))
+        return $decoded;
+
+    $lines = preg_split('/\r\n|\r|\n/', $out);
+    if (!is_array($lines))
+        return null;
+
+    for ($i = count($lines) - 1; $i >= 0; --$i)
+    {
+        $line = trim($lines[$i]);
+        if ($line === "")
+            continue;
+        $decoded = json_decode($line, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded))
+            return $decoded;
+    }
+
+    return null;
+}
+
 function send_data(
     string $host,
     array $data,
@@ -82,6 +109,10 @@ function send_data(
         return null;
     }
 
+    if ($exitCode !== 0) {
+        return null;
+    }
+
     if (!is_string($out)) {
         return null;
     }
@@ -91,9 +122,9 @@ function send_data(
         return null;
     }
 
-    $decoded = json_decode($out, true);
+    $decoded = persoc_decode_distrans_output($out);
     persoc_log("distrans answered $out", true);
-    if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+    if (!is_array($decoded)) {
         return null;
     }
 

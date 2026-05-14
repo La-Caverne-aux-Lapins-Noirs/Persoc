@@ -54,8 +54,15 @@ The most important fields are:
 ```dab
 Distrans = "192.168.200.1"
 Deadlist = "/etc/persoc/deadlist.csv"
+LogFile = "/var/log/persoc/persoc.log"
 LocalUser = "technocore"
 Custom = "192.168.200.1"
+
+[SSH
+  User = "distrans"
+  Port = 4422
+  IdentityFile = "/root/.ssh/ihk"
+]
 
 [Intervals
   Tick = 1
@@ -75,7 +82,7 @@ Custom = "192.168.200.1"
 
 ## SSH access to Distrans
 
-Persoc currently sends data to Distrans with:
+Persoc sends data to Distrans with the SSH parameters from the `SSH` section:
 
 ```text
 ssh -T -i /root/.ssh/ihk -p 4422 distrans@<Distrans>
