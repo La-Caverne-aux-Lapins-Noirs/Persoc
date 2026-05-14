@@ -5,6 +5,11 @@ case "$1" in
     configure)
 	install -d -m 0755 -o root -g root /etc/persoc/conf.d
 	install -d -m 0750 -o root -g root /var/log/persoc/
+	if [ ! -e /etc/persoc/deadlist.csv ]; then
+		: > /etc/persoc/deadlist.csv
+	fi
+	chown root:root /etc/persoc/deadlist.csv
+	chmod 0644 /etc/persoc/deadlist.csv
 	;;
 esac
 

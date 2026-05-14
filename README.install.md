@@ -19,7 +19,8 @@ The Debian package installs:
 - the default configuration in `/etc/persoc/persoc.dab`;
 - the configuration overlay directory `/etc/persoc/conf.d/`;
 - the systemd service `persoc.service`;
-- the log directory `/var/log/persoc/`.
+- the log directory `/var/log/persoc/`;
+- an empty `/etc/persoc/deadlist.csv` if no local deadlist already exists.
 
 With debhelper/systemd integration, `persoc.service` is installed as a normal system service. On a systemd machine, it can be managed with:
 
@@ -70,7 +71,7 @@ Custom = "192.168.200.1"
 
 `LocalUser` is protected by `persoc_kill_graphical_session()` and will not be killed by the intruder expulsion logic. It should be the local technical/admin user, not a student account.
 
-`Deadlist` is the local CSV file written by `get_new_deadlist()` and read by `firewall_deadlist()`.
+`Deadlist` is the local CSV file written by `get_new_deadlist()` and read by `firewall_deadlist()`. The package creates an empty `/etc/persoc/deadlist.csv` on install so that the first service start does not fail before the first successful refresh.
 
 ## SSH access to Distrans
 
