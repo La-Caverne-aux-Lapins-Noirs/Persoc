@@ -1,3 +1,4 @@
 src/* usr/lib/persoc/
 persoc.dab etc/persoc/
 persoc usr/libexec/
+README.install.md usr/share/doc/persoc/
