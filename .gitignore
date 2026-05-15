@@ -6,3 +6,4 @@ files
 debian/workspy.*
 debian/workspy/
 *.errors
+.coverage

@@ -5,6 +5,28 @@ case "$1" in
     configure)
 	install -d -m 0755 -o root -g root /etc/persoc/conf.d
 	install -d -m 0750 -o root -g root /var/log/persoc/
+	if [ ! -e /var/log/persoc/persoc.log ]; then
+		: > /var/log/persoc/persoc.log
+	fi
+	chown root:root /var/log/persoc/persoc.log
+	chmod 0640 /var/log/persoc/persoc.log
+
+	install -d -m 0700 -o root -g root /root/.ssh
+	if [ ! -e /root/.ssh/ihk ] && command -v ssh-keygen >/dev/null 2>&1; then
+		ssh-keygen -q -t ed25519 -N "" -f /root/.ssh/ihk -C "persoc@$(hostname 2>/dev/null || echo unknown)"
+	fi
+	if [ -e /root/.ssh/ihk ]; then
+		chown root:root /root/.ssh/ihk
+		chmod 0600 /root/.ssh/ihk
+	fi
+	if [ -e /root/.ssh/ihk.pub ]; then
+		chown root:root /root/.ssh/ihk.pub
+		chmod 0644 /root/.ssh/ihk.pub
+		cp /root/.ssh/ihk.pub /etc/persoc/ihk.pub
+		chown root:root /etc/persoc/ihk.pub
+		chmod 0644 /etc/persoc/ihk.pub
+	fi
+
 	if [ ! -e /etc/persoc/deadlist.csv ]; then
 		: > /etc/persoc/deadlist.csv
 	fi
@@ -12,5 +34,7 @@ case "$1" in
 	chmod 0644 /etc/persoc/deadlist.csv
 	;;
 esac
+
+#DEBHELPER#
 
 exit 0

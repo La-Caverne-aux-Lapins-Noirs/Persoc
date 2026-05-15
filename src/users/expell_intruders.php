@@ -107,12 +107,12 @@ function persoc_list_graphical_sessions(): array
 }
 
 /** Terminate a graphical session (prefer loginctl by session id; fallback to pkill -KILL -u user). */
-function persoc_kill_graphical_session(string $sid, string $user): void
+function persoc_kill_graphical_session(string $sid, string $user): bool
 {
     global $Configuration;
     
     if (@$Configuration["LocalUser"] && $user == $Configuration["LocalUser"])
-	return ;
+	return false;
     $user = trim($user);
     $sid  = trim($sid);
 
@@ -123,7 +123,7 @@ function persoc_kill_graphical_session(string $sid, string $user): void
     {
         // terminate-session is clean; kill-session exists too.
         @system("loginctl terminate-session " . escapeshellarg($sid) . " 2>/dev/null", $ret);
-        return;
+        return true;
     }
 
     if ($user !== "")
@@ -131,7 +131,10 @@ function persoc_kill_graphical_session(string $sid, string $user): void
         // Fallback: harsh but effective; will kill all processes of the user.
         // Use only if we don't have a session id (older fallback path).
         @system("pkill -KILL -u " . escapeshellarg($user) . " 2>/dev/null", $ret);
+        return true;
     }
+
+    return false;
 }
 
 /** Parse start_at from IH response; accept int unix or strtotime-compatible string. Returns unix timestamp or null. */
@@ -259,8 +262,8 @@ function users_expell_intruders(): array
             // exam mode: only a.b.exam allowed
             if (!$isExamUser)
             {
-                persoc_kill_graphical_session($sid, $user);
-                $killed[] = $user;
+                if (persoc_kill_graphical_session($sid, $user))
+                    $killed[] = $user;
             }
         }
         else
@@ -268,8 +271,8 @@ function users_expell_intruders(): array
             // non-exam mode: exam accounts forbidden
             if ($isExamUser)
             {
-                persoc_kill_graphical_session($sid, $user);
-                $killed[] = $user;
+                if (persoc_kill_graphical_session($sid, $user))
+                    $killed[] = $user;
             }
         }
     }

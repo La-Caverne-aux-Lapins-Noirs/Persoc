@@ -7,7 +7,8 @@ Standards-Version: 4.6.2
 Package: persoc
 Section: admin
 Architecture: all
-Depends: ${misc:Depends}, php-cli, openssh-client, nftables, iproute2, procps, systemd, bsdutils, liblapin-utils
+Depends: ${misc:Depends}, php-cli, openssh-client, nftables, iproute2, procps, systemd, bsdutils, util-linux, liblapin-utils
+Recommends: logrotate
 Description: Session utils.
   Allow Distrans to set firewall on Huile systems. Allow
   users to announce automatically they are working to infosphere hand.

@@ -1,11 +1,19 @@
 [Unit]
 Description=Persoc
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=12
 
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/bin/php /usr/libexec/persoc
+ExecStart=/usr/libexec/persoc
 Restart=always
+RestartSec=5s
+KillSignal=SIGTERM
+TimeoutStopSec=10s
+Environment=PERSOC_LOG_FILE=/var/log/persoc/persoc.log
 
 [Install]
 WantedBy=multi-user.target

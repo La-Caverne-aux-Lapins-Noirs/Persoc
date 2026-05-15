@@ -20,7 +20,10 @@ The Debian package installs:
 - the configuration overlay directory `/etc/persoc/conf.d/`;
 - the systemd service `persoc.service`;
 - the log directory `/var/log/persoc/`;
-- an empty `/etc/persoc/deadlist.csv` if no local deadlist already exists.
+- an empty `/etc/persoc/deadlist.csv` if no local deadlist already exists;
+- `/root/.ssh/ihk` as an Ed25519 key if it does not already exist;
+- `/etc/persoc/ihk.pub`, a root-owned readable copy of the public key to authorize on Distrans;
+- a logrotate rule for `/var/log/persoc/persoc.log`.
 
 With debhelper/systemd integration, `persoc.service` is installed as a normal system service. On a systemd machine, it can be managed with:
 
@@ -32,6 +35,10 @@ sudo journalctl -u persoc.service -f
 ```
 
 The historical `install.sh` helper now does the same basic service activation. It is only a convenience helper; package installation should rely on the Debian maintainer scripts.
+
+The package does not know how to authorize the generated SSH key on the Distrans server. After installation, copy `/etc/persoc/ihk.pub` into the Distrans-side authorized keys for the `distrans` endpoint.
+
+The Debian maintainer scripts are expected to let debhelper enable/start `persoc.service` automatically. If service start is blocked by local policy, the manual command remains `sudo systemctl enable --now persoc.service`.
 
 ## Required configuration
 
@@ -91,6 +98,7 @@ ssh -T -i /root/.ssh/ihk -p 4422 distrans@<Distrans>
 So the machine must have:
 
 - `/root/.ssh/ihk`, readable only by root;
+- `/etc/persoc/ihk.pub`, the public key copy to authorize on the Distrans host;
 - the corresponding public key authorized on the Distrans host;
 - network access to the Distrans SSH port.
 
@@ -130,9 +138,9 @@ Recommended sequence:
 
 1. Install the package.
 2. Check `/etc/persoc/persoc.dab` and `/etc/persoc/conf.d/`.
-3. Install `/root/.ssh/ihk` and verify its permissions.
-4. Verify SSH connectivity to Distrans manually.
-5. Start Persoc with `systemctl enable --now persoc.service`.
+3. Verify that `/root/.ssh/ihk` and `/etc/persoc/ihk.pub` exist.
+4. Copy `/etc/persoc/ihk.pub` to the Distrans server authorization list, then verify SSH connectivity manually.
+5. Check that `persoc.service` is enabled and running; if not, start it with `systemctl enable --now persoc.service`.
 6. Watch `journalctl -u persoc.service -f` and `/var/log/persoc/persoc.log`.
 7. Confirm that Distrans receives `persoc_log` and `log_activity` packets.
 8. Test deadlist refresh before testing exam mode.
