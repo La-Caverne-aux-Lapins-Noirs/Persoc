@@ -52,10 +52,19 @@ try
 
     // Startup: reset + deadlist
     persoc_log("startup: firewall_reset()");
-    firewall_reset();
+    $r = firewall_reset();
+    if (!($r["ok"] ?? false))
+        persoc_log("startup: firewall_reset failed: " . ($r["error"] ?? "unknown error"));
 
-    persoc_log("startup: firewall_deadlist()");
-    firewall_deadlist($Configuration["Deadlist"]);
+    persoc_log("startup: get_new_deadlist()");
+    $r = get_new_deadlist();
+    if (!($r["ok"] ?? false))
+    {
+        persoc_log("startup: get_new_deadlist failed: " . ($r["error"] ?? "unknown error") . "; applying local deadlist");
+        $r = firewall_deadlist($Configuration["Deadlist"]);
+        if (!($r["ok"] ?? false))
+            persoc_log("startup: firewall_deadlist failed: " . ($r["error"] ?? "unknown error"));
+    }
 
     $tick = (int)$Configuration["Intervals"]["Tick"];
     $activityEvery = (int)$Configuration["Intervals"]["Activity"];
@@ -76,7 +85,14 @@ try
         if ($deadlistEvery > 0 && $now >= $nextDeadlist)
         {
             $nextDeadlist = $now + $deadlistEvery;
-            firewall_deadlist($Configuration["Deadlist"]);
+            $r = get_new_deadlist();
+            if (!($r["ok"] ?? false))
+            {
+                persoc_log("get_new_deadlist failed: " . ($r["error"] ?? "unknown error") . "; keeping/applying local deadlist");
+                $r = firewall_deadlist($Configuration["Deadlist"]);
+                if (!($r["ok"] ?? false))
+                    persoc_log("firewall_deadlist failed: " . ($r["error"] ?? "unknown error"));
+            }
         }
 
         if ($now >= $nextActivity)
@@ -89,10 +105,21 @@ try
         {
             $nextIntruders = $now + $intrudersEvery;
 
-            // Ask IH (via users_expell_intruders) and apply exam firewall accordingly
+            // Ask IH (via users_expell_intruders) and apply exam firewall accordingly.
+            // On communication/error cases, keep the current firewall state: do not
+            // silently disable exam mode just because Distrans did not answer.
             $r = users_expell_intruders();
-            $exam = is_array($r) ? (bool)($r["exam"] ?? false) : false;
-            firewall_exam($exam);
+            if (is_array($r) && ($r["ok"] ?? false) === true && array_key_exists("exam", $r))
+            {
+                $fw = firewall_exam((bool)$r["exam"]);
+                if (!($fw["ok"] ?? false))
+                    persoc_log("firewall_exam failed: " . ($fw["error"] ?? "unknown error"));
+            }
+            else
+            {
+                $err = is_array($r) ? (string)($r["error"] ?? "unknown error") : "invalid return";
+                persoc_log("users_expell_intruders failed: " . $err . "; keeping current exam firewall state");
+            }
         }
 
         sleep($tick);

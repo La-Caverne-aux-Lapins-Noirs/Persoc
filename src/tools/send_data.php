@@ -62,6 +62,18 @@ function send_data(
     string $identityFile = "/root/.ssh/ihk",
 ): ?array
 {
+    global $Configuration;
+
+    if (isset($Configuration) && is_array($Configuration) && isset($Configuration["SSH"]) && is_array($Configuration["SSH"]))
+    {
+        if (isset($Configuration["SSH"]["User"]) && is_string($Configuration["SSH"]["User"]) && trim($Configuration["SSH"]["User"]) !== "")
+            $sshUser = trim($Configuration["SSH"]["User"]);
+        if (isset($Configuration["SSH"]["Port"]))
+            $port = max(1, min(65535, (int)$Configuration["SSH"]["Port"]));
+        if (isset($Configuration["SSH"]["IdentityFile"]) && is_string($Configuration["SSH"]["IdentityFile"]) && trim($Configuration["SSH"]["IdentityFile"]) !== "")
+            $identityFile = trim($Configuration["SSH"]["IdentityFile"]);
+    }
+
     $stdin = hand_packet($data);
 
     $args = [
@@ -75,6 +87,9 @@ function send_data(
         "-o", "UserKnownHostsFile=/dev/null",
         "-o", "StrictHostKeyChecking=no",
         "-o", "LogLevel=ERROR",
+        "-o", "ConnectTimeout=5",
+        "-o", "ServerAliveInterval=5",
+        "-o", "ServerAliveCountMax=1",
         $sshUser . "@" . $host,
     ];
 

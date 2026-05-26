@@ -109,7 +109,7 @@ function persoc_users_get_activity(): array
                 "username" => $username,
                 "mode" => "ssh",
                 "lock" => false,
-                "last_activity" => date("d/m/Y H:i:s", $last),
+                "last_activity" => date("c", $last),
             ];
         }
         else
@@ -122,14 +122,14 @@ function persoc_users_get_activity(): array
                     "username" => $username,
                     "mode" => "x",
                     "lock" => true,
-                    "last_activity" => date("d/m/Y H:i:s", $last),
+                    "last_activity" => date("c", $last),
                 ];
             } else {
                 $users[] = [
                     "username" => $username,
                     "mode" => "x",
                     "lock" => false,
-                    "last_activity" => date("d/m/Y H:i:s", $now),
+                    "last_activity" => date("c", $now),
                 ];
             }
         }
@@ -214,7 +214,7 @@ function users_log_activity(): ?array
 
     $packet = [
         "command" => "log_activity",
-        "date" => date("d/m/Y H:i:s"),
+        "date" => date("c"),
         "mac" => $id["mac"],
         "name" => $name,
         "ip" => $id["ip"],
@@ -222,6 +222,6 @@ function users_log_activity(): ?array
         "users" => persoc_users_get_activity(),
     ];
 
-    persoc_log("sending user log to distrans.");
+    persoc_log("sending user log to distrans.", true);
     return send_data($Configuration["Distrans"], $packet);
 }
