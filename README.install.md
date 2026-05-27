@@ -34,7 +34,6 @@ sudo systemctl restart persoc.service
 sudo journalctl -u persoc.service -f
 ```
 
-The historical `install.sh` helper now does the same basic service activation. It is only a convenience helper; package installation should rely on the Debian maintainer scripts.
 
 The package does not know how to authorize the generated SSH key on the Distrans server. After installation, copy `/etc/persoc/ihk.pub` into the Distrans-side authorized keys for the `distrans` endpoint.
 

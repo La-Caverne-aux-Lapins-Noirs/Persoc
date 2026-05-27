@@ -79,7 +79,14 @@ function get_new_deadlist(): array
     }
 
     // Refresh nft (your firewall_deadlist already does idempotent-ish work)
-    firewall_deadlist($dl);
+    $fw = firewall_deadlist($dl);
+    if (!(($fw["ok"] ?? false) === true))
+        return [
+            "ok" => false,
+            "error" => "deadlist saved but firewall apply failed: " . ($fw["error"] ?? "unknown error"),
+            "path" => $dl,
+            "firewall" => $fw,
+        ];
 
     return ["ok" => true, "path" => $dl];
 }
