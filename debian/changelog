@@ -1,3 +1,10 @@
+persoc (1.0.0+XXX+1) unstable; urgency=medium
+
+  * Ensure /etc/persoc/conf.d exists as an installed package directory.
+  * Restore package conffiles left as .dpkg-new when the expected file is absent.
+
+ -- Technocore <Contact@YourAdmin>  Wed, 10 Jun 2026 20:55:00 +0200
+
 persoc (1.0.0+XXX) unstable; urgency=medium
 
   * Bring software.

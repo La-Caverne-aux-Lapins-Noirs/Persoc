@@ -5,6 +5,23 @@ case "$1" in
     configure)
 	install -d -m 0755 -o root -g root /etc/persoc/conf.d
 	install -d -m 0750 -o root -g root /var/log/persoc/
+	install -d -m 0755 -o root -g root /etc/logrotate.d
+
+	if [ ! -e /etc/persoc/persoc.dab ] && [ -e /etc/persoc/persoc.dab.dpkg-new ]; then
+		mv /etc/persoc/persoc.dab.dpkg-new /etc/persoc/persoc.dab
+	fi
+	if [ -e /etc/persoc/persoc.dab ]; then
+		chown root:root /etc/persoc/persoc.dab
+		chmod 0644 /etc/persoc/persoc.dab
+	fi
+
+	if [ ! -e /etc/logrotate.d/persoc ] && [ -e /etc/logrotate.d/persoc.dpkg-new ]; then
+		mv /etc/logrotate.d/persoc.dpkg-new /etc/logrotate.d/persoc
+	fi
+	if [ -e /etc/logrotate.d/persoc ]; then
+		chown root:root /etc/logrotate.d/persoc
+		chmod 0644 /etc/logrotate.d/persoc
+	fi
 	if [ ! -e /var/log/persoc/persoc.log ]; then
 		: > /var/log/persoc/persoc.log
 	fi
