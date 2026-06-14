@@ -214,7 +214,6 @@ function users_log_activity(): ?array
 
     $packet = [
         "command" => "log_activity",
-        "date" => date("c"),
         "mac" => $id["mac"],
         "name" => $name,
         "ip" => $id["ip"],

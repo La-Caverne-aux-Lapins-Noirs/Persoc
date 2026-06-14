@@ -74,6 +74,7 @@ function send_data(
             $identityFile = trim($Configuration["SSH"]["IdentityFile"]);
     }
 
+    $data["date"] = date("c");
     $stdin = hand_packet($data);
 
     $args = [
