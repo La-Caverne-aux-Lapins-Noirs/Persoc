@@ -58,7 +58,7 @@ function send_data(
     string $host,
     array $data,
     string $sshUser = "distrans",
-    int $port = 4422,
+    int $port = 22,
     string $identityFile = "/root/.ssh/ihk",
 ): ?array
 {
