@@ -41,7 +41,7 @@ function persoc_is_user_lock(string $user): int
         return 0;
 
     // Strict-ish: parse ps output, match xtrlock-pam command
-    $lst = @shell_exec("ps -eo user,pid,etime,cmd 2>/dev/null | grep xtrlock-pam | grep " . escapeshellarg($user) . " | grep -v grep | tr -s ' '");
+    $lst = @shell_exec("ps -eo user:256,pid,etime,cmd 2>/dev/null | grep xtrlock-pam | grep " . escapeshellarg($user) . " | grep -v grep | tr -s ' '");
     if (!is_string($lst) || trim($lst) === "")
         return 0;
 
