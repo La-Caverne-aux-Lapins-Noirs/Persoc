@@ -76,6 +76,18 @@ Custom = "192.168.200.1"
   Intruders = 5
   Deadlist = 59
 ]
+
+[Activity
+  Enabled = true
+  TTYRecentSeconds = 120
+  IdlePenaltySeconds = 1800
+  RecentFileSeconds = 900
+  FilesystemScanEvery = 30
+  MaxScanDepth = 6
+  MaxScanFiles = 5000
+  SuspiciousAfterSeconds = 900
+  HomePattern = "/home/users/%u"
+]
 ```
 
 `Distrans` is the host contacted through SSH by `send_data()`.
@@ -85,6 +97,12 @@ Custom = "192.168.200.1"
 `LocalUser` is protected by `persoc_kill_graphical_session()` and will not be killed by the intruder expulsion logic. It should be the local technical/admin user, not a student account.
 
 `Deadlist` is the local CSV file written by `get_new_deadlist()` and read by `firewall_deadlist()`. The package creates an empty `/etc/persoc/deadlist.csv` on install so that the first service start does not fail before the first successful refresh.
+
+`Activity` configures the refined real-work estimator used inside `log_activity`. The old fields remain present in packets, but each user may also carry optional fields such as `tty`, `tty_idle_seconds`, `foreground`, `activity_state`, `activity_score`, `activity_reasons`, `file_write_count_recent`, `source_write_count_recent` and `last_file_write`.
+
+The estimator deliberately treats SSH/TTY input as a weak signal. A recent terminal event can mark a session as `warm`, but it is capped unless it is accompanied by stronger work signals such as a source file write in a project directory or a foreground command like `gcc`, `make`, `gdb`, `valgrind`, `python`, `git`, etc. This prevents a stuck key from being counted as real work.
+
+When terminal input remains recent for a long time without any file/process work signal, the user can be reported as `activity_state=suspicious` with reason `tty_active_without_work_signal`.
 
 ## SSH access to Distrans
 

@@ -102,7 +102,7 @@ assert_contains($stdin, "\"username\":\"alice\"", "packet missing alice");
 assert_contains($stdin, "\"mode\":\"x\"", "packet missing x mode");
 assert_contains($stdin, "\"lock\":true", "packet missing lock true");
 assert_contains($stdin, "\"username\":\"bob\"", "packet missing bob");
-assert_contains($stdin, "\"mode\":\"ssh\"", "packet missing ssh mode");
+assert_contains($stdin, "\"mode\":\"ssh_idle\"", "packet missing ssh_idle mode for idle SSH user");
 assert_contains($stdin, "stop\v", "packet missing stop marker");
 
 rm_rf($tmp);

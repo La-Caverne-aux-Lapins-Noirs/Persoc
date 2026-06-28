@@ -121,6 +121,49 @@ function load_configuration(string $conf_file = ""): array
     $conf["Intervals"]["Intruders"] = max(1, (int)$conf["Intervals"]["Intruders"]);
     $conf["Intervals"]["Deadlist"]  = max(0, (int)$conf["Intervals"]["Deadlist"]);
 
+    // Optional: refined activity scoring. These values are also guarded at
+    // runtime in log_activity.php so old configurations remain valid.
+    if (!isset($conf["Activity"]) || !is_array($conf["Activity"]))
+        $conf["Activity"] = [];
+
+    $activity_list = function($value, array $default): array {
+        if ($value === null)
+            return $default;
+        if (is_string($value))
+            $value = [$value];
+        if (!is_array($value))
+            return $default;
+
+        $out = [];
+        foreach ($value as $v)
+        {
+            if (!is_string($v))
+                continue;
+            $v = trim($v);
+            if ($v !== "")
+                $out[] = $v;
+        }
+        return array_values(array_unique($out));
+    };
+
+    $a = &$conf["Activity"];
+    if (!isset($a["Enabled"])) $a["Enabled"] = true;
+    if (!isset($a["Debug"])) $a["Debug"] = false;
+    $a["TTYRecentSeconds"] = max(1, (int)($a["TTYRecentSeconds"] ?? 120));
+    $a["IdlePenaltySeconds"] = max(1, (int)($a["IdlePenaltySeconds"] ?? 1800));
+    $a["RecentFileSeconds"] = max(1, (int)($a["RecentFileSeconds"] ?? 900));
+    $a["FilesystemScanEvery"] = max(1, (int)($a["FilesystemScanEvery"] ?? 30));
+    $a["MaxScanDepth"] = max(0, (int)($a["MaxScanDepth"] ?? 6));
+    $a["MaxScanFiles"] = max(1, (int)($a["MaxScanFiles"] ?? 5000));
+    $a["SuspiciousAfterSeconds"] = max(1, (int)($a["SuspiciousAfterSeconds"] ?? 900));
+    if (!isset($a["HomePattern"]) || !is_string($a["HomePattern"]) || trim($a["HomePattern"]) === "")
+        $a["HomePattern"] = "/home/users/%u";
+    $a["WorkPaths"] = $activity_list($a["WorkPaths"] ?? null, ["work", "Work", "rendu", "Rendu", "projects", "Projects", "Projets"]);
+    $a["SourceExtensions"] = $activity_list($a["SourceExtensions"] ?? null, ["c", "h", "cpp", "hpp", "cc", "cxx", "hh", "py", "php", "js", "ts", "java", "cs", "sh", "dab", "md", "tex"]);
+    $a["EditorCommands"] = $activity_list($a["EditorCommands"] ?? null, ["emacs", "vim", "vi", "nano", "micro", "code", "nvim"]);
+    $a["WorkCommands"] = $activity_list($a["WorkCommands"] ?? null, ["gcc", "g++", "clang", "clang++", "make", "cmake", "ninja", "gdb", "valgrind", "python", "python3", "php", "node", "npm", "git"]);
+    unset($a);
+
     $identity = persoc_configuration_detect_network_identity();
     $conf["Interface"] = $identity["Interface"];
     $conf["IP"] = $identity["IP"];

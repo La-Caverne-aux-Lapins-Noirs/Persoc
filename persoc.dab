@@ -11,6 +11,19 @@
   Deadlist = 59
 ]
 
+[Activity
+  Enabled = true
+  Debug = false
+  TTYRecentSeconds = 120
+  IdlePenaltySeconds = 1800
+  RecentFileSeconds = 900
+  FilesystemScanEvery = 30
+  MaxScanDepth = 6
+  MaxScanFiles = 5000
+  SuspiciousAfterSeconds = 900
+  HomePattern = "/home/users/%u"
+]
+
 LocalUser = "technocore"
 Distrans = "192.168.200.1"
 Custom = "192.168.200.1"
