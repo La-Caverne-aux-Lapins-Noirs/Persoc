@@ -16,6 +16,7 @@
   Debug = false
   TTYRecentSeconds = 120
   IdlePenaltySeconds = 1800
+  WIdleHardSeconds = 1800
   RecentFileSeconds = 900
   FilesystemScanEvery = 30
   MaxScanDepth = 6

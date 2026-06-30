@@ -15,20 +15,41 @@ function persoc_parse_duration(string $idle): int
     if ($idle === '.' || $idle === '')
         return 0;
 
+    $lower = strtolower($idle);
+
+    // procps/w may display very old idle sessions as "old".  The exact
+    // duration is lost at that point, but it is at least clearly idle.
+    if ($lower === "old")
+        return 86400;
+
     // "123s" or "123.45s"
-    if (preg_match('/^([0-9]+)(\.[0-9]+)?s$/', $idle, $m))
+    if (preg_match('/^([0-9]+)(\.[0-9]+)?s$/', $lower, $m))
         return (int)$m[1];
 
-    // "MM:SS" (w idle often), or "HH:MM" (sometimes)
-    if (preg_match('/^([0-9]+):([0-9]+)$/', $idle, $m))
+    // "12m" / "2h" / "3days" variants seen in w/procps output.
+    if (preg_match('/^([0-9]+)m$/', $lower, $m))
+        return (int)$m[1] * 60;
+    if (preg_match('/^([0-9]+)h$/', $lower, $m))
+        return (int)$m[1] * 3600;
+    if (preg_match('/^([0-9]+)day(s)?$/', $lower, $m))
+        return (int)$m[1] * 86400;
+
+    // procps/w commonly uses "HH:MMm" once idle reaches minutes/hours.
+    if (preg_match('/^([0-9]+):([0-9]+)m$/', $lower, $m))
+        return ((int)$m[1] * 3600 + (int)$m[2] * 60);
+
+    // "MM:SS" (legacy tests / some tools), or "HH:MM" depending on producer.
+    // We keep the historical Persoc interpretation here to avoid changing old
+    // behaviour for existing mocks and non-w callers.
+    if (preg_match('/^([0-9]+):([0-9]+)$/', $lower, $m))
         return ((int)$m[1] * 60 + (int)$m[2]);
 
     // "HH:MM:SS"
-    if (preg_match('/^([0-9]+):([0-9]+):([0-9]+)$/', $idle, $m))
+    if (preg_match('/^([0-9]+):([0-9]+):([0-9]+)$/', $lower, $m))
         return ((int)$m[1] * 3600 + (int)$m[2] * 60 + (int)$m[3]);
 
     // "DD-HH:MM:SS" (ps etime can be like 1-02:03:04)
-    if (preg_match('/^([0-9]+)-([0-9]+):([0-9]+):([0-9]+)$/', $idle, $m))
+    if (preg_match('/^([0-9]+)-([0-9]+):([0-9]+):([0-9]+)$/', $lower, $m))
         return ((int)$m[1] * 86400 + (int)$m[2] * 3600 + (int)$m[3] * 60 + (int)$m[4]);
 
     return 0;
@@ -119,6 +140,7 @@ function persoc_activity_configuration(): array
         "Debug" => persoc_activity_bool($a["Debug"] ?? false, false),
         "TTYRecentSeconds" => max(1, (int)($a["TTYRecentSeconds"] ?? 120)),
         "IdlePenaltySeconds" => max(1, (int)($a["IdlePenaltySeconds"] ?? 1800)),
+        "WIdleHardSeconds" => max(1, (int)($a["WIdleHardSeconds"] ?? ($a["IdlePenaltySeconds"] ?? 1800))),
         "RecentFileSeconds" => max(1, (int)($a["RecentFileSeconds"] ?? 900)),
         "FilesystemScanEvery" => max(1, (int)($a["FilesystemScanEvery"] ?? 30)),
         "MaxScanDepth" => max(0, (int)($a["MaxScanDepth"] ?? 6)),
@@ -381,16 +403,21 @@ function persoc_activity_evaluate_user(string $username, string $mode, string $t
     $score = 0;
     $reasons = [];
 
+    // This idle value comes from the IDLE column of `w`.  It is not a proof of
+    // work, but it is a useful first-order signal: if the terminal has not
+    // received input for a long time, an open SSH session should normally not be
+    // counted as active merely because files were modified recently.
     $ttyRecent = $idleSeconds <= (int)$cfg["TTYRecentSeconds"];
+    $wIdleHard = $idleSeconds >= (int)$cfg["WIdleHardSeconds"];
     if ($ttyRecent)
     {
         $score += 20;
-        $reasons[] = "tty_recent";
+        $reasons[] = "w_idle_recent";
     }
     else if ($idleSeconds >= (int)$cfg["IdlePenaltySeconds"])
     {
         $score -= 35;
-        $reasons[] = "tty_idle_long";
+        $reasons[] = "w_idle_long";
     }
 
     $fg = persoc_tty_foreground_process($tty);
@@ -438,6 +465,15 @@ function persoc_activity_evaluate_user(string $username, string $mode, string $t
     {
         $score -= 40;
         $reasons[] = "tty_active_without_work_signal";
+    }
+
+    // If `w` says the terminal itself has been idle for a long time, Persoc
+    // forces SSH to idle unless an actual work command is in foreground.  This
+    // avoids counting stale recent file mtimes or editor autosaves as presence.
+    if ($wIdleHard && $fgClass !== "work")
+    {
+        $score = min($score, 25);
+        $reasons[] = "w_idle_forced_idle";
     }
 
     // Hard cap: raw input alone, even with an editor in foreground, must not be
@@ -527,7 +563,7 @@ function persoc_users_get_activity(): array
     $users = [];
 
     // Classic `w` parsing (kept for compatibility / simplicity)
-    $lst = @shell_exec("PROCPS_USERLEN=32 w 2>/dev/null | tr -s ' '");
+    $lst = @shell_exec("LC_ALL=C PROCPS_USERLEN=32 w -i 2>/dev/null | tr -s ' '");
     if (!is_string($lst) || trim($lst) === "")
         return $users;
 

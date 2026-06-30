@@ -67,6 +67,7 @@ assert_eq($conf["Activity"]["Enabled"], true, "Activity.Enabled default");
 assert_eq($conf["Activity"]["Debug"], false, "Activity.Debug default");
 assert_eq($conf["Activity"]["TTYRecentSeconds"], 120, "Activity.TTYRecentSeconds default");
 assert_eq($conf["Activity"]["IdlePenaltySeconds"], 1800, "Activity.IdlePenaltySeconds default");
+assert_eq($conf["Activity"]["WIdleHardSeconds"], 1800, "Activity.WIdleHardSeconds default");
 assert_eq($conf["Activity"]["RecentFileSeconds"], 900, "Activity.RecentFileSeconds default");
 assert_eq($conf["Activity"]["FilesystemScanEvery"], 30, "Activity.FilesystemScanEvery default");
 assert_eq($conf["Activity"]["MaxScanDepth"], 6, "Activity.MaxScanDepth default");

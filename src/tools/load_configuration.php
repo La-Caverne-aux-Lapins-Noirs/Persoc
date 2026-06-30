@@ -151,6 +151,7 @@ function load_configuration(string $conf_file = ""): array
     if (!isset($a["Debug"])) $a["Debug"] = false;
     $a["TTYRecentSeconds"] = max(1, (int)($a["TTYRecentSeconds"] ?? 120));
     $a["IdlePenaltySeconds"] = max(1, (int)($a["IdlePenaltySeconds"] ?? 1800));
+    $a["WIdleHardSeconds"] = max(1, (int)($a["WIdleHardSeconds"] ?? $a["IdlePenaltySeconds"]));
     $a["RecentFileSeconds"] = max(1, (int)($a["RecentFileSeconds"] ?? 900));
     $a["FilesystemScanEvery"] = max(1, (int)($a["FilesystemScanEvery"] ?? 30));
     $a["MaxScanDepth"] = max(0, (int)($a["MaxScanDepth"] ?? 6));
