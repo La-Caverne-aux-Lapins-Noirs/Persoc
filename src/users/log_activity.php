@@ -558,6 +558,72 @@ function persoc_activity_debug_fields(array $activity): array
  *  - last_activity (string "d/m/Y H:i:s")
  *  - optional activity_* debug fields only when Activity.Debug=true
  */
+function persoc_users_get_graphical_sessions(): array
+{
+    $sessions = [];
+
+    $out = @shell_exec("command -v loginctl 2>/dev/null");
+    if (!is_string($out) || trim($out) === "")
+        return $sessions;
+
+    $list = @shell_exec("loginctl list-sessions --no-legend 2>/dev/null");
+    if (!is_string($list) || trim($list) === "")
+        return $sessions;
+
+    foreach (explode("\n", trim($list)) as $line)
+    {
+        $line = trim($line);
+        if ($line === "")
+            continue;
+
+        $cols = preg_split('/\s+/', $line);
+        $sid = is_array($cols) ? (string)($cols[0] ?? "") : "";
+        if ($sid === "")
+            continue;
+
+        $info = @shell_exec(
+            "loginctl show-session " . escapeshellarg($sid) .
+            " -p Name -p Type -p Class -p Remote -p Active -p State -p Display -p TTY 2>/dev/null"
+        );
+        if (!is_string($info) || trim($info) === "")
+            continue;
+
+        $properties = [];
+        foreach (explode("\n", trim($info)) as $property)
+        {
+            $pos = strpos($property, "=");
+            if ($pos === false)
+                continue;
+            $properties[substr($property, 0, $pos)] = substr($property, $pos + 1);
+        }
+
+        $username = trim((string)($properties["Name"] ?? ""));
+        $type = strtolower(trim((string)($properties["Type"] ?? "")));
+        $class = strtolower(trim((string)($properties["Class"] ?? "")));
+        $remote = strtolower(trim((string)($properties["Remote"] ?? "")));
+        $active = strtolower(trim((string)($properties["Active"] ?? "")));
+        $state = strtolower(trim((string)($properties["State"] ?? "")));
+
+        if ($username === "" || !in_array($type, ["x11", "wayland"], true))
+            continue;
+        if ($class !== "user" || $remote === "yes")
+            continue;
+        if ($active !== "yes" && $state !== "active")
+            continue;
+
+        $tty = trim((string)($properties["TTY"] ?? ""));
+        if ($tty === "")
+            $tty = trim((string)($properties["Display"] ?? ""));
+
+        $sessions[] = [
+            "username" => $username,
+            "tty" => $tty,
+        ];
+    }
+
+    return $sessions;
+}
+
 function persoc_users_get_activity(): array
 {
     $users = [];
@@ -637,6 +703,37 @@ function persoc_users_get_activity(): array
                 $users[] = $row;
             }
         }
+    }
+
+    // `w` does not reliably expose graphical sessions on every procps/systemd
+    // combination. Complete its result with active local x11/wayland sessions
+    // reported by logind. Keep `w` as the source for idle/activity data and SSH.
+    $knownGraphicalUsers = [];
+    foreach ($users as $user)
+        if (($user["mode"] ?? "") === "x")
+            $knownGraphicalUsers[(string)($user["username"] ?? "")] = true;
+
+    foreach (persoc_users_get_graphical_sessions() as $session)
+    {
+        $username = (string)($session["username"] ?? "");
+        if ($username === "" || isset($knownGraphicalUsers[$username]))
+            continue;
+
+        $tty = (string)($session["tty"] ?? "");
+        $lockAge = persoc_is_user_lock($username);
+        $lock = $lockAge > 0;
+        $idleSeconds = $lock ? $lockAge : 0;
+        $last = $now - $idleSeconds;
+        $activity = persoc_activity_evaluate_user($username, "x", $tty, $idleSeconds, $lock);
+        $row = [
+            "username" => $username,
+            "mode" => "x",
+            "lock" => $lock,
+            "last_activity" => date("c", $last),
+        ];
+        $row += persoc_activity_debug_fields($activity);
+        $users[] = $row;
+        $knownGraphicalUsers[$username] = true;
     }
 
     return $users;
