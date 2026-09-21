@@ -151,11 +151,23 @@ function firewall_deadlist(string $csvPath = "/etc/persoc/deadlist.csv"): array
         }
     }
 
+    $dns = ["ok" => true, "enabled" => false];
+    if (function_exists("persoc_dns_enabled") && persoc_dns_enabled())
+    {
+        $dns = persoc_dns_apply_deadlist($csvPath);
+        if (!(($dns["ok"] ?? false) === true))
+        {
+            $ok = false;
+            $errors[] = "DNS guard: " . ($dns["error"] ?? "unknown error");
+        }
+    }
+
     return ([
         "ok" => $ok,
         "error" => $ok ? "" : ("nft errors on: " . implode(" | ", $errors)),
         "blocked_v4" => count($v4List),
         "blocked_v6" => count($v6List),
         "entries" => $entries,
+        "dns" => $dns,
     ]);
 }

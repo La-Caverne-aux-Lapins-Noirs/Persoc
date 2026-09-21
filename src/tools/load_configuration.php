@@ -107,6 +107,32 @@ function load_configuration(string $conf_file = ""): array
     if (!isset($conf["LogFile"]) || !is_string($conf["LogFile"]) || trim($conf["LogFile"]) === "")
         $conf["LogFile"] = "/var/log/persoc/persoc.log";
 
+    // Optional: local DNS guard for hostname deadlist entries.  DNS traffic is
+    // transparently redirected to a private dnsmasq instance on a high port;
+    // this avoids competing with systemd-resolved/NetworkManager on port 53.
+    if (!isset($conf["DNS"]) || !is_array($conf["DNS"]))
+        $conf["DNS"] = [];
+    $dns = &$conf["DNS"];
+    if (!array_key_exists("Enabled", $dns)) $dns["Enabled"] = true;
+    if (!array_key_exists("BrowserPolicies", $dns)) $dns["BrowserPolicies"] = true;
+    $dns["Enabled"] = (bool)$dns["Enabled"];
+    $dns["BrowserPolicies"] = (bool)$dns["BrowserPolicies"];
+    $dns["Port"] = max(1024, min(65535, (int)($dns["Port"] ?? 53535)));
+    foreach ([
+        "ConfigFile" => "/etc/persoc/dnsmasq.conf",
+        "PidFile" => "/run/persoc-dnsmasq.pid",
+        "User" => "nobody",
+        "Group" => "nogroup",
+        "FirefoxPolicy" => "/etc/firefox/policies/policies.json",
+        "ChromiumPolicy" => "/etc/chromium/policies/managed/persoc.json",
+        "ChromePolicy" => "/etc/opt/chrome/policies/managed/persoc.json",
+    ] as $key => $fallback)
+        if (!isset($dns[$key]) || !is_string($dns[$key]) || trim($dns[$key]) === "")
+            $dns[$key] = $fallback;
+        else
+            $dns[$key] = trim($dns[$key]);
+    unset($dns);
+
     // Intervals defaults are centralized here
     if (!isset($conf["Intervals"]) || !is_array($conf["Intervals"]))
         $conf["Intervals"] = [];

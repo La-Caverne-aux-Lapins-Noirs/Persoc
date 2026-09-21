@@ -276,6 +276,19 @@ function firewall_exam(bool $enabled): array
 
     // ---- program exam_out chain deterministically ----
     $nft("nft flush chain inet filter exam_out 2>/dev/null || true", $r12);
+
+    // Student DNS is redirected by the deadlist guard after the NAT output
+    // hook.  Allow that loopback request before the exam catch-all drop, or an
+    // exam would accidentally disable DNS even for explicitly allowed sites.
+    if (function_exists("persoc_dns_enabled") && persoc_dns_enabled())
+    {
+        $dns_settings = persoc_dns_settings();
+        $dns_port = (int)$dns_settings["Port"];
+        $nft("nft add rule inet filter exam_out meta skuid @exam_uids ip daddr 127.0.0.1 udp dport " . $dns_port . " accept", $rd1);
+        $nft("nft add rule inet filter exam_out meta skuid @exam_uids ip daddr 127.0.0.1 tcp dport " . $dns_port . " accept", $rd2);
+        $nft("nft add rule inet filter exam_out meta skuid @exam_uids ip6 daddr ::1 udp dport " . $dns_port . " accept", $rd3);
+        $nft("nft add rule inet filter exam_out meta skuid @exam_uids ip6 daddr ::1 tcp dport " . $dns_port . " accept", $rd4);
+    }
     $nft("nft add rule inet filter exam_out meta skuid @exam_uids ip daddr @exam_allow_v4 accept", $r13);
     $nft("nft add rule inet filter exam_out meta skuid @exam_uids ip6 daddr @exam_allow_v6 accept", $r14);
     $nft("nft add rule inet filter exam_out meta skuid @exam_uids drop", $r15);

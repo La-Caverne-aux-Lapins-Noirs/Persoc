@@ -3,7 +3,7 @@
 Persoc is installed as a system service on lab machines. It is the local agent that:
 
 - reports machine/user activity to Distrans;
-- retrieves and applies the remote deadlist firewall rules;
+- retrieves and applies the remote deadlist with nftables and a local DNS guard;
 - asks Distrans whether the current machine is in exam mode;
 - applies the exam firewall;
 - terminates graphical sessions that are not allowed in the current exam state.
@@ -97,6 +97,24 @@ Custom = "192.168.200.1"
 `LocalUser` is protected by `persoc_kill_graphical_session()` and will not be killed by the intruder expulsion logic. It should be the local technical/admin user, not a student account.
 
 `Deadlist` is the local CSV file written by `get_new_deadlist()` and read by `firewall_deadlist()`. The package creates an empty `/etc/persoc/deadlist.csv` on install so that the first service start does not fail before the first successful refresh.
+
+Hostname deadlist entries are also enforced through a private `dnsmasq` instance. Persoc runs it on loopback port `53535`, redirects classic DNS (TCP/UDP 53) from other users to it with nftables, and returns NXDOMAIN for the blocked domain and all its subdomains. The existing resolved-IP nftables sets remain active as a second line of defence.
+
+The default DNS guard configuration is:
+
+```dab
+[DNS
+  Enabled = true
+  Port = 53535
+  ConfigFile = "/etc/persoc/dnsmasq.conf"
+  PidFile = "/run/persoc-dnsmasq.pid"
+  User = "nobody"
+  Group = "nogroup"
+  BrowserPolicies = true
+]
+```
+
+When `BrowserPolicies` is enabled, Persoc also forces Firefox and Chromium/Chrome to disable DNS-over-HTTPS. Firefox's system policy is merged into `/etc/firefox/policies/policies.json`; Chromium and Chrome get independent `persoc.json` managed-policy files. Existing unrelated Firefox policies are preserved. Browser processes already running when the policy is first installed should be restarted.
 
 `Activity` configures the refined real-work estimator used inside `log_activity`. The old fields remain present in packets, but each user may also carry optional fields such as `tty`, `tty_idle_seconds`, `foreground`, `activity_state`, `activity_score`, `activity_reasons`, `file_write_count_recent`, `source_write_count_recent` and `last_file_write`.
 

@@ -61,6 +61,8 @@ try {
 assert_eq($conf["Distrans"], "ih.home", "home config Distrans");
 assert_eq($conf["Custom"], ["updates.local"], "string Custom normalization");
 assert_eq($conf["Deadlist"], "/etc/persoc/deadlist.csv", "blank Deadlist default");
+assert_eq($conf["DNS"]["Enabled"], true, "DNS guard default should be enabled");
+assert_eq($conf["DNS"]["Port"], 53535, "DNS guard port default");
 assert_eq($conf["Intervals"], ["Tick" => 1, "Activity" => 5, "Intruders" => 5, "Deadlist" => 0], "interval defaults");
 assert_true(isset($conf["Activity"]) && is_array($conf["Activity"]), "Activity defaults should exist when missing from config");
 assert_eq($conf["Activity"]["Enabled"], true, "Activity.Enabled default");

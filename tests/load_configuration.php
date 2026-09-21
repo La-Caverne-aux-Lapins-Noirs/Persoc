@@ -60,6 +60,8 @@ $conf = with_path_prefix($bin, function() use ($config) {
 assert_eq($conf["Distrans"], "ih.test", "Distrans mismatch");
 assert_eq($conf["Custom"], ["repo.test", "192.168.1.1"], "Custom normalization mismatch");
 assert_eq($conf["Deadlist"], "/etc/persoc/deadlist.csv", "Deadlist default mismatch");
+assert_eq($conf["DNS"]["Enabled"], true, "DNS guard default should be enabled");
+assert_eq($conf["DNS"]["Port"], 53535, "DNS guard port default");
 assert_eq($conf["LogFile"], "/var/log/persoc/persoc.log", "LogFile default mismatch");
 assert_eq($conf["Intervals"], ["Tick" => 1, "Activity" => 7, "Intruders" => 8, "Deadlist" => 9], "Intervals mismatch");
 assert_eq($conf["IP"], "192.168.1.50", "IP mismatch");

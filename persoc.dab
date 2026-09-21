@@ -29,5 +29,15 @@ LocalUser = "technocore"
 Distrans = "192.168.200.1"
 Custom = "192.168.200.1"
 Deadlist = "/etc/persoc/deadlist.csv"
+
+[DNS
+  Enabled = true
+  Port = 53535
+  ConfigFile = "/etc/persoc/dnsmasq.conf"
+  PidFile = "/run/persoc-dnsmasq.pid"
+  User = "nobody"
+  Group = "nogroup"
+  BrowserPolicies = true
+]
 @include "conf.d/"
 

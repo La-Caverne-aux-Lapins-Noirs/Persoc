@@ -381,3 +381,31 @@ SH;
 
     put_exe($binDir . "/ip", $sh);
 }
+
+function install_mock_dnsmasq(string $binDir, string $logFile): void
+{
+    @mkdir($binDir, 0755, true);
+    $logEsc = str_replace("'", "'\"'\"'", $logFile);
+    $sh = <<<SH
+#!/bin/sh
+LOGFILE='$logEsc'
+out="dnsmasq"
+pidfile=""
+for a in "\$@"; do
+  out="\$out|\$a"
+  case "\$a" in
+    --pid-file=*) pidfile=\${a#--pid-file=} ;;
+  esac
+done
+echo "\$out" >> "\$LOGFILE"
+case "\$*" in
+  *--test*) exit 0 ;;
+esac
+if [ -z "\$pidfile" ]; then exit 1; fi
+(sleep 300) >/dev/null 2>&1 &
+pid=\$!
+echo "\$pid" > "\$pidfile"
+exit 0
+SH;
+    put_exe($binDir . "/dnsmasq", $sh);
+}
