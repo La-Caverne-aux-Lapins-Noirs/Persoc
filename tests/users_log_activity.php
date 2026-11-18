@@ -55,6 +55,12 @@ fi
 exit 1
 SH);
 
+install_mock_cmd($bin, "dpkg-query", <<<'SH'
+#!/bin/sh
+[ "$1" = "-W" ] && [ "$3" = "huile" ] || exit 1
+printf 'installed\t2:1.0.0+1761642810~deb13u1-1\n'
+SH);
+
 // Mock w (2 header lines + 2 user lines)
 install_mock_cmd($bin, "w", <<<'SH'
 #!/bin/sh
@@ -97,6 +103,7 @@ assert_contains($stdin, "\"mac\":\"aa:bb:cc:dd:ee:ff\"", "packet missing mac");
 assert_contains($stdin, "\"name\":\"pc01\"", "packet missing name");
 assert_contains($stdin, "\"ip\":\"192.168.1.50\"", "packet missing ip");
 assert_contains($stdin, "\"type\":", "packet missing type");
+assert_contains($stdin, "\"huile_version\":\"2:1.0.0+1761642810~deb13u1-1\"", "packet missing installed Huile version");
 assert_contains($stdin, "\"users\":", "packet missing users");
 assert_contains($stdin, "\"username\":\"alice\"", "packet missing alice");
 assert_contains($stdin, "\"mode\":\"x\"", "packet missing x mode");
@@ -104,6 +111,16 @@ assert_contains($stdin, "\"lock\":true", "packet missing lock true");
 assert_contains($stdin, "\"username\":\"bob\"", "packet missing bob");
 assert_contains($stdin, "\"mode\":\"ssh_idle\"", "packet missing ssh_idle mode for idle SSH user");
 assert_contains($stdin, "stop\v", "packet missing stop marker");
+
+install_mock_cmd($bin, "ssh", <<<'SH'
+#!/bin/sh
+if grep -q '"huile_version"'; then
+    printf '%s\n' '{"status":"ko","message":"unexpected activity field: huile_version"}'
+else
+    printf '%s\n' '{"ok":true,"msg":"stored"}'
+fi
+SH);
+assert_eq(with_path_prefix($bin, 'users_log_activity'), $expected, "older Distrans still receives the activity");
 
 rm_rf($tmp);
 fwrite(STDOUT, "OK ".basename(__FILE__)."\n");

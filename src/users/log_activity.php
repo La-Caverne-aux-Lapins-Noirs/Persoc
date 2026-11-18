@@ -791,6 +791,23 @@ function persoc_get_machine_type(): string
     return "linux";
 }
 
+function persoc_get_huile_version(): ?string
+{
+    static $version = null;
+    static $next_check = 0;
+
+    $now = time();
+    if ($now >= $next_check)
+    {
+        $format = '${db:Status-Status}\t${Version}\n';
+        $line = @shell_exec("LC_ALL=C dpkg-query -W -f=" . escapeshellarg($format) . " huile 2>/dev/null");
+        $version = is_string($line) && preg_match('/\Ainstalled\t([0-9][A-Za-z0-9.:+~-]{0,254})\n\z/', $line, $match)
+            ? $match[1] : null;
+        $next_check = $now + 60;
+    }
+    return $version;
+}
+
 /**
  * Main function: sends the packet to IH log_activity.
  * No params: host is $Configuration["Distrans"].
@@ -800,6 +817,7 @@ function persoc_get_machine_type(): string
 function users_log_activity(): ?array
 {
     global $Configuration;
+    static $retry_huile_at = 0;
 
     if (!isset($Configuration["Distrans"]) || !is_string($Configuration["Distrans"]) || trim($Configuration["Distrans"]) === "")
         return null;
@@ -821,7 +839,18 @@ function users_log_activity(): ?array
         "type" => persoc_get_machine_type(),
         "users" => persoc_users_get_activity(),
     ];
+    if (time() >= $retry_huile_at)
+        $packet["huile_version"] = persoc_get_huile_version();
 
     persoc_log("sending user log to distrans.", true);
-    return send_data($Configuration["Distrans"], $packet);
+    $response = send_data($Configuration["Distrans"], $packet);
+    if (array_key_exists("huile_version", $packet)
+        && ($response["message"] ?? null) === "unexpected activity field: huile_version")
+    {
+        // Older Distrans rejects the unknown field before recording the sample.
+        $retry_huile_at = time() + 60;
+        unset($packet["huile_version"]);
+        return send_data($Configuration["Distrans"], $packet);
+    }
+    return $response;
 }
