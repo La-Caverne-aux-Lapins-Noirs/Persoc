@@ -82,6 +82,12 @@ assert_contains($joined, "10.10.0.30", "Custom allowed IP missing");
 assert_true(nft_calls_has($calls, '/^nft\|add\|rule\|inet\|filter\|exam_out\|meta\|skuid\|@exam_uids\|drop\b/'),
     "Missing: drop rule in exam_out");
 
+file_put_contents($log, '');
+with_path_prefix($bin, static fn(): array => firewall_exam(true, ['bob']));
+$calls = implode("\n", read_nft_calls($log));
+assert_contains($calls, '1002', 'an explicit local exam account is filtered');
+assert_true(!str_contains($calls, '1001'), 'ordinary graphical UID is skipped when the daemon supplies exam accounts');
+
 rm_rf($tmp);
 fwrite(STDOUT, "OK ".basename(__FILE__)."\n");
 exit(0);

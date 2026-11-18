@@ -38,6 +38,11 @@ $res = with_path_prefix($bin, function() {
 assert_eq($res["ok"] ?? true, false, "invalid is_exam response should fail");
 assert_eq($res["error"] ?? "", "is_exam: no response", "invalid is_exam error");
 
+install_mock_ssh($bin, $sshArgsLog, $sshStdin, '{"result":"ko","message":"invalid room state"}');
+$res = with_path_prefix($bin, 'users_expell_intruders');
+assert_eq($res['ok'] ?? true, false, 'Distrans error must not restore normal mode');
+assert_true(!array_key_exists('exam', $res), 'transport errors carry no mode to apply');
+
 rm_rf($tmp);
 fwrite(STDOUT, "OK " . basename(__FILE__) . "\n");
 exit(0);

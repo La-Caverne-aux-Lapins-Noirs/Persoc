@@ -42,13 +42,8 @@ assert_true(is_array($res) && ($res["ok"] ?? false) === true, "users_expell_intr
 assert_eq($res["graphical_sessions"] ?? -1, 2, "who fallback graphical session count");
 $killed = $res["killed"] ?? [];
 assert_true(is_array($killed), "killed must be array");
-assert_true(in_array("alice", $killed, true), "normal user should be killed in exam mode via pkill fallback");
-assert_true(!in_array("john.doe.exam", $killed, true), "exam account must not be killed in exam mode");
-
-$pkill = file_exists($pkillLog) ? file_get_contents($pkillLog) : "";
-assert_true(is_string($pkill), "pkill log unreadable");
-assert_contains($pkill, "-KILL -u alice", "pkill fallback should target alice");
-assert_true(strpos($pkill, "john.doe.exam") === false, "pkill fallback must not target exam account");
+assert_eq($killed, [], "closing a session requires a logind session ID");
+assert_true(!file_exists($pkillLog), "a user-wide kill would hit unrelated SSH sessions");
 
 rm_rf($tmp);
 fwrite(STDOUT, "OK " . basename(__FILE__) . "\n");

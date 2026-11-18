@@ -111,9 +111,11 @@ try
             $r = users_expell_intruders();
             if (is_array($r) && ($r["ok"] ?? false) === true && array_key_exists("exam", $r))
             {
-                $fw = firewall_exam((bool)$r["exam"]);
+                $fw = firewall_exam($r["exam"], $r["exam_users"]);
                 if (!($fw["ok"] ?? false))
                     persoc_log("firewall_exam failed: " . ($fw["error"] ?? "unknown error"));
+                if (!persoc_publish_exam_deadlines($r["exam_deadlines"]))
+                    persoc_log("Cannot publish exam deadlines for the desktop");
             }
             else
             {

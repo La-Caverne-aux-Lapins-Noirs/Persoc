@@ -20,8 +20,7 @@ $bin = $tmp . "/bin";
 $sshArgsLog  = $tmp . "/ssh.args.log";
 $sshStdin    = $tmp . "/ssh.stdin.dump";
 $loginctlLog = $tmp . "/loginctl.log";
-$wallLog     = $tmp . "/wall.log";
-$wallStdin   = $tmp . "/wall.stdin.dump";
+$noticeLog   = $tmp . "/notice.log";
 
 // Network identity for IH is_exam (mac needed)
 install_mock_ip_basic($bin, "eth0", "192.168.1.50", "aa:bb:cc:dd:ee:ff");
@@ -32,21 +31,18 @@ install_mock_loginctl_with_terminate($bin, $loginctlLog, [
     "11" => ["Name" => "john.doe.exam","Type" => "x11",     "Class" => "user"],
 ]);
 
-install_mock_wall($bin, $wallLog, $wallStdin);
-
 global $Configuration;
 $Configuration = [
     "Distrans" => "ih.test",
 ];
 
-// ---- Scenario 1: exam = true, start_at in 4 min, now seconds == 00 => wall + expel alice ----
-$now = 1700000000 - (1700000000 % 60); // fixed epoch, ends with ...00 seconds? (it does)
+// ---- Scenario 1: manual exam mode keeps the exam account ----
+$now = 1700000000;
 putenv("PERSOC_NOW=" . $now);
 
 $resp1 = json_encode([
     "result" => "ok",
-    "exam" => true,
-    "start_at" => $now + 240
+    "exam" => true
 ], JSON_UNESCAPED_UNICODE);
 assert_true(is_string($resp1), "json_encode resp1 failed");
 
@@ -61,7 +57,6 @@ with_path_prefix($bin, function() {
     assert_true(is_array($k), "killed must be array");
     assert_true(in_array("alice", $k, true), "alice must be expelled in exam mode");
     assert_true(!in_array("john.doe.exam", $k, true), "exam user must not be expelled in exam mode");
-    assert_true(($res["warned"] ?? false) === true, "should warn via wall when start_at < 5min and seconds==00");
 });
 
 // Check loginctl terminate-session called for sid 10 (alice)
@@ -70,17 +65,8 @@ $joined = is_array($lcalls) ? implode("\n", $lcalls) : "";
 assert_contains($joined, "terminate-session|10", "should terminate session 10 (alice) in scenario 1");
 assert_true(strpos($joined, "terminate-session|11") === false, "must NOT terminate exam session 11 in scenario 1");
 
-// Check wall was called and message dumped
-$wlog = file_exists($wallLog) ? file_get_contents($wallLog) : "";
-assert_true(is_string($wlog) && trim($wlog) !== "", "wall should be invoked in scenario 1");
-$wmsg = file_exists($wallStdin) ? file_get_contents($wallStdin) : "";
-assert_true(is_string($wmsg) && strpos($wmsg, "EXAM imminent") !== false, "wall message should mention exam imminent");
-
-// ---- Scenario 2: exam = false => expel john.doe.exam, no wall requirement ----
-// Reset logs
+// ---- Scenario 2: exam = false => expel john.doe.exam ----
 @unlink($loginctlLog);
-@unlink($wallLog);
-@unlink($wallStdin);
 
 $resp2 = json_encode([
     "result" => "ok",
@@ -105,9 +91,59 @@ $joined2 = is_array($lcalls2) ? implode("\n", $lcalls2) : "";
 assert_contains($joined2, "terminate-session|11", "should terminate session 11 (john.doe.exam) in scenario 2");
 assert_true(strpos($joined2, "terminate-session|10") === false, "must NOT terminate alice session 10 in scenario 2");
 
-// wall should not be invoked
-$wlog2 = file_exists($wallLog) ? file_get_contents($wallLog) : "";
-assert_true(!is_string($wlog2) || trim($wlog2) === "", "wall should not be invoked in scenario 2");
+// A scheduled exam warns current and new logins once, then checks the roster.
+$start = $now + 600;
+putenv('PERSOC_NOW=' . ($now - 1));
+install_mock_cmd($bin, 'runuser', "#!/bin/sh\nexit 0\n");
+install_mock_cmd($bin, 'timeout', "#!/bin/sh\nprintf '%s\\n' \"\$@\" >> " . escapeshellarg($noticeLog) . "\nexit 0\n");
+$exam_sessions = [
+    '20' => ['Name' => 'alice.bunny', 'Type' => 'x11', 'Class' => 'user', 'Display' => ':0'],
+    '21' => ['Name' => 'bob.cat', 'Type' => 'tty', 'Class' => 'user', 'TTY' => 'tty2'],
+    '26' => ['Name' => 'alice.bunny', 'Type' => 'tty', 'Class' => 'user', 'TTY' => 'pts/1', 'Remote' => 'yes'],
+    '27' => ['Name' => 'carol.dog', 'Type' => 'x11', 'Class' => 'user', 'Display' => ':3', 'Service' => 'sshd'],
+];
+install_mock_loginctl_with_terminate($bin, $loginctlLog, $exam_sessions);
+$upcoming = ['result' => 'ok', 'mode' => 'upcoming', 'exam' => false, 'session_id' => 42, 'start_at' => $start];
+install_mock_ssh($bin, $sshArgsLog, $sshStdin, json_encode($upcoming));
+$poll = static fn(): array => with_path_prefix($bin, 'users_expell_intruders');
+assert_eq($poll()['warned'], false, 'no warning before ten minutes');
+putenv('PERSOC_NOW=' . $now);
+$open_warning = $poll();
+assert_eq($open_warning['warned'], true, 'warning starts at ten minutes');
+assert_eq($open_warning['killed'], [], 'ordinary sessions stay open during the warning');
+$notices = file_get_contents($noticeLog);
+assert_contains($notices, 'DISPLAY=:0', 'existing local graphical session gets a popup');
+assert_contains($notices, '/dev/tty2', 'only the local text console gets a terminal notice');
+assert_true(!str_contains($notices, 'pts/1') && !str_contains($notices, 'DISPLAY=:3'), 'remote sessions receive no warning');
+assert_eq($poll()['warned'], false, 'same sessions are not warned again');
+
+$exam_sessions['22'] = ['Name' => 'carol.dog', 'Type' => 'x11', 'Class' => 'user', 'Display' => ':1'];
+install_mock_loginctl_with_terminate($bin, $loginctlLog, $exam_sessions);
+putenv('PERSOC_NOW=' . ($now + 7));
+assert_eq($poll()['warned'], true, 'new graphical login is warned between minute boundaries');
+
+$exam_sessions['23'] = ['Name' => 'alice.bunny.exam', 'Type' => 'tty', 'Class' => 'user', 'TTY' => 'tty3'];
+$exam_sessions['24'] = ['Name' => 'carol.dog.exam', 'Type' => 'x11', 'Class' => 'user'];
+$exam_sessions['25'] = ['Name' => 'alice.bunny.exam', 'Type' => 'tty', 'Class' => 'user', 'Remote' => 'yes'];
+install_mock_loginctl_with_terminate($bin, $loginctlLog, $exam_sessions);
+@unlink($loginctlLog);
+putenv('PERSOC_NOW=' . $start);
+$active = array_replace($upcoming, ['exam' => true, 'mode' => 'exam', 'allowed_users' => ['alice.bunny.exam']]);
+install_mock_ssh($bin, $sshArgsLog, $sshStdin, json_encode($active));
+$active_result = $poll();
+assert_eq($active_result['warned'], false, 'no warning once the exam starts');
+assert_eq($active_result['exam_users'], ['alice.bunny.exam', 'carol.dog.exam'], 'ordinary accounts are excluded from UID filtering');
+$calls = file_get_contents($loginctlLog);
+foreach (['20', '21', '22', '24', '25'] as $sid)
+    assert_contains($calls, 'terminate-session|' . $sid, 'unauthorized session ' . $sid . ' is closed');
+assert_true(!str_contains($calls, 'terminate-session|23'), 'registered local exam console stays open');
+assert_true(!str_contains($calls, 'terminate-session|26'), 'SSH using the same login as a closed desktop stays connected');
+assert_true(!str_contains($calls, 'terminate-session|27'), 'the SSH PAM service also protects remote graphical logins');
+
+@unlink($loginctlLog);
+install_mock_ssh($bin, $sshArgsLog, $sshStdin, '{"result":"ok","mode":"normal","exam":false}');
+$poll();
+assert_contains(file_get_contents($loginctlLog), 'terminate-session|23', 'end closes the remaining exam session');
 
 rm_rf($tmp);
 fwrite(STDOUT, "OK ".basename(__FILE__)."\n");

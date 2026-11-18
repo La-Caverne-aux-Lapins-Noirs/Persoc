@@ -1,25 +1,7 @@
 <?php
 declare(strict_types=1);
 
-/*
- * Persoc: expel intruders depending on exam mode (Distrans is_exam).
- *
- * Rules:
- * - Ask Distrans if exam mode is on for THIS machine (mac-based room mapping).
- * - If exam == true:
- *     close all graphical sessions (x11/wayland) whose username is NOT a.b.exam
- * - If exam == false:
- *     close all graphical sessions (x11/wayland) whose username IS a.b.exam
- *
- * Additional requirement:
- * - Distrans will provide a "start_at" field (future).
- * - If exam starts in less than 5 minutes:
- *     broadcast a warning message to ALL graphical users (wall)
- *     but only when current seconds == 00 (to avoid spam).
- *
- * No parameters. Host is in $Configuration["Distrans"].
- * Needs send_data() available.
- */
+// Distrans decides the room mode and which exam accounts may use this workstation.
 
 function persoc_now(): int
 {
@@ -36,105 +18,94 @@ function persoc_is_exam_account(string $username): bool
     return preg_match('/^[^.]+\.[^.]+\.exam$/', $username) === 1;
 }
 
-/** Debian/systemd: list graphical users via loginctl (x11/wayland); fallback to who heuristic. */
-function persoc_list_graphical_sessions(): array
+function persoc_is_maintenance_user(string $user): bool
 {
-    $out = @shell_exec("command -v loginctl 2>/dev/null");
-    $hasLoginctl = is_string($out) && trim($out) !== "";
+    global $Configuration;
 
-    $sessions = []; // each: ["sid"=>string,"user"=>string,"type"=>string]
+    return $user === 'root' || $user === ($Configuration['LocalUser'] ?? null);
+}
 
-    if ($hasLoginctl)
+function persoc_exam_graphical_session(array $session): bool
+{
+    return in_array($session['type'], ['x11', 'wayland'], true);
+}
+
+function persoc_exam_managed_login(string $user): bool
+{
+    return persoc_is_exam_account($user) || preg_match('/^[a-z]+\.[a-z]+[0-9]*$/D', $user) === 1;
+}
+
+function persoc_list_exam_sessions(): array
+{
+    $sessions = [];
+    $list = @shell_exec('loginctl list-sessions --no-legend 2>/dev/null');
+    if (is_string($list) && trim($list) !== '')
     {
-        $list = @shell_exec("loginctl list-sessions --no-legend 2>/dev/null");
-        if (is_string($list) && trim($list) !== "")
+        foreach (explode("\n", trim($list)) as $line)
         {
-            foreach (explode("\n", trim($list)) as $line)
-            {
-                $line = trim($line);
-                if ($line === "") continue;
+            $sid = preg_split('/\s+/', trim($line), 2)[0];
+            if (!preg_match('/^[a-zA-Z0-9]+$/D', $sid))
+                continue;
 
-                $parts = preg_split('/\s+/', $line);
-                if (!$parts || !isset($parts[0])) continue;
-                $sid = $parts[0];
+            $info = @shell_exec('loginctl show-session ' . escapeshellarg($sid)
+                . ' -p Name -p Type -p Class -p Display -p TTY -p Remote -p Service 2>/dev/null');
+            if (!is_string($info) || trim($info) === '')
+                continue;
 
-                $info = @shell_exec("loginctl show-session " . escapeshellarg($sid) . " -p Name -p Type -p Class 2>/dev/null");
-                if (!is_string($info) || trim($info) === "") continue;
-
-                $name = null;
-                $type = null;
-                $class = null;
-
-                foreach (explode("\n", trim($info)) as $kv)
+            $properties = [];
+            foreach (explode("\n", trim($info)) as $property)
+                if (str_contains($property, '='))
                 {
-                    $kv = trim($kv);
-                    if ($kv === "" || strpos($kv, "=") === false) continue;
-                    [$k, $v] = explode("=", $kv, 2);
-                    if ($k === "Name")  $name  = $v;
-                    if ($k === "Type")  $type  = $v;
-                    if ($k === "Class") $class = $v;
+                    [$key, $value] = explode('=', $property, 2);
+                    $properties[$key] = $value;
                 }
 
-                if ($name === null || $type === null) continue;
-                if ($class !== null && $class !== "user") continue;
+            $user = $properties['Name'] ?? '';
+            if ($user === '' || ($properties['Class'] ?? 'user') !== 'user' || persoc_is_maintenance_user($user))
+                continue;
 
-                if ($type === "x11" || $type === "wayland")
-                    $sessions[] = ["sid" => (string)$sid, "user" => (string)$name, "type" => (string)$type];
-            }
-            return $sessions;
+            $tty = $properties['TTY'] ?? '';
+            if (str_starts_with($tty, '/dev/'))
+                $tty = substr($tty, 5);
+            $service = $properties['Service'] ?? '';
+            $remote = ($properties['Remote'] ?? '') === 'yes' || str_starts_with($tty, 'pts/')
+                || str_starts_with($service, 'sshd') || str_starts_with($service, 'x2go');
+            $session = [
+                'sid' => $sid,
+                'user' => $user,
+                'type' => $properties['Type'] ?? '',
+                'display' => $properties['Display'] ?? '',
+                'tty' => $tty,
+                'remote' => $remote,
+            ];
+            if (persoc_exam_graphical_session($session) ||
+                (($session['type'] === 'tty' || $remote) && persoc_exam_managed_login($user)))
+                $sessions[] = $session;
         }
-        // if loginctl exists but returned nothing, fall back below
+        return $sessions;
     }
 
-    // Fallback: who lines with (:0) etc. (no session id available)
-    $who = @shell_exec("who 2>/dev/null");
-    if (!is_string($who) || trim($who) === "")
-        return [];
-
-    $seen = [];
+    $who = (string)@shell_exec('who 2>/dev/null');
     foreach (explode("\n", trim($who)) as $line)
     {
-        $line = trim($line);
-        if ($line === "") continue;
-        if (preg_match('/^(\S+)\s+.*\(\s*:[0-9]+\s*\)\s*$/', $line, $m) === 1)
-            $seen[$m[1]] = true;
+        if (!preg_match('~^(\S+)\s+(\S+)\s+~', $line, $entry) || persoc_is_maintenance_user($entry[1]))
+            continue;
+        $display = preg_match('/\(\s*(:[0-9]+(?:\.[0-9]+)?)\s*\)$/D', trim($line), $match) ? $match[1] : '';
+        if ($display !== '' || persoc_exam_managed_login($entry[1]))
+            $sessions[] = ['sid' => '', 'user' => $entry[1], 'tty' => $entry[2],
+                'type' => $display === '' ? 'tty' : 'x11', 'display' => $display,
+                'remote' => str_starts_with($entry[2], 'pts/')];
     }
-
-    foreach (array_keys($seen) as $u)
-        $sessions[] = ["sid" => "", "user" => $u, "type" => "x11"];
-
     return $sessions;
 }
 
-/** Terminate a graphical session (prefer loginctl by session id; fallback to pkill -KILL -u user). */
-function persoc_kill_graphical_session(string $sid, string $user): bool
+function persoc_terminate_exam_session(array $session): bool
 {
-    global $Configuration;
-    
-    if (@$Configuration["LocalUser"] && $user == $Configuration["LocalUser"])
-	return false;
-    $user = trim($user);
-    $sid  = trim($sid);
-
-    $out = @shell_exec("command -v loginctl 2>/dev/null");
-    $hasLoginctl = is_string($out) && trim($out) !== "";
-
-    if ($hasLoginctl && $sid !== "")
-    {
-        // terminate-session is clean; kill-session exists too.
-        @system("loginctl terminate-session " . escapeshellarg($sid) . " 2>/dev/null", $ret);
-        return true;
-    }
-
-    if ($user !== "")
-    {
-        // Fallback: harsh but effective; will kill all processes of the user.
-        // Use only if we don't have a session id (older fallback path).
-        @system("pkill -KILL -u " . escapeshellarg($user) . " 2>/dev/null", $ret);
-        return true;
-    }
-
-    return false;
+    // A user-wide termination would also close that user's SSH connections.
+    if ($session['sid'] === '')
+        return false;
+    @exec('loginctl terminate-session ' . escapeshellarg($session['sid']) . ' 2>/dev/null', $out, $status);
+    return $status === 0;
 }
 
 /** Parse start_at from IH response; accept int unix or strtotime-compatible string. Returns unix timestamp or null. */
@@ -192,7 +163,131 @@ function persoc_get_net_identity_for_exam(): ?array
     return ["ip" => $ip, "mac" => $mac];
 }
 
-/** Main function requested. */
+function persoc_warn_exam_sessions(array $sessions, string $exam, int $seconds): bool
+{
+    static $last_exam = null;
+    static $sent = [];
+
+    if ($last_exam !== $exam)
+    {
+        $last_exam = $exam;
+        $sent = [];
+    }
+
+    $minutes = (int)ceil($seconds / 60);
+    $message = "Examen imminent. Début dans $minutes min.\nEnregistre ton travail et libère le poste avant le début.";
+    $present = [];
+    $warned = false;
+    foreach ($sessions as $session)
+    {
+        if ($session['remote'] || persoc_is_exam_account($session['user']))
+            continue;
+        $key = $session['user'] . ':' . ($session['sid'] !== '' ? $session['sid'] : $session['tty']);
+        $present[$key] = true;
+        if (isset($sent[$key]))
+            continue;
+        $delivered = persoc_exam_graphical_session($session)
+            ? persoc_exam_popup($session, $message)
+            : persoc_exam_console_notice($session, $message);
+        if ($delivered)
+        {
+            $sent[$key] = true;
+            $warned = true;
+        }
+    }
+    $sent = array_intersect_key($sent, $present);
+    return $warned;
+}
+
+function persoc_exam_console_notice(array $session, string $message): bool
+{
+    if (!preg_match('/^tty[1-9][0-9]*$/D', $session['tty']))
+        return false;
+
+    // Write to this console only. A broadcast would also reach remote terminals.
+    $print = 'test -c "$1" && printf "\\r\\n%s\\r\\n" "$2" > "$1"';
+    $args = ['timeout', '1', 'sh', '-c', $print, 'sh', '/dev/' . $session['tty'], $message];
+    @exec(implode(' ', array_map('escapeshellarg', $args)) . ' 2>/dev/null', $out, $status);
+    return $status === 0;
+}
+
+function persoc_exam_popup(array $session, string $message, string $title = 'Examen imminent'): bool
+{
+    if (!preg_match('/^:[0-9]+(?:\.[0-9]+)?$/D', $session['display']))
+        return false;
+
+    // Run the X client as the account that owns the LightDM session and its Xauthority.
+    $args = ['runuser', '-u', $session['user'], '--', 'env', '-u', 'XAUTHORITY', 'DISPLAY=' . $session['display']];
+    $command = implode(' ', array_map('escapeshellarg', $args));
+    @exec('timeout 1 ' . $command . ' xdpyinfo >/dev/null 2>&1', $out, $status);
+    if ($status !== 0)
+        return false;
+
+    // The dialog can stay open without blocking the next check of the room state.
+    @exec($command . ' xmessage -title ' . escapeshellarg($title) . ' -center -timeout 30 -buttons OK:0 -default OK '
+        . escapeshellarg($message) . ' </dev/null >/dev/null 2>&1 &', $out, $status);
+    return $status === 0;
+}
+
+function persoc_exam_feedback(array $sessions, array $timing, int $now): array
+{
+    static $sent = [];
+    $notices = [];
+    $deadlines = [];
+    foreach ($sessions as $session)
+    {
+        $user = $session['user'];
+        $end = $timing[$user]['end_at'] ?? null;
+        if (!is_int($end) || $end <= $now)
+            continue;
+        $graphical = persoc_exam_graphical_session($session);
+        if ($graphical)
+            $deadlines[$user] = $end;
+        $next = $timing[$user]['next_intermediate_at'] ?? null;
+        if (!is_int($next) || $next <= $now || $next >= $end || $next - $now > 300)
+            continue;
+
+        $terminal = $session['sid'] !== '' ? $session['sid'] : $session['tty'];
+        $key = implode(':', [$user, $terminal, $timing[$user]['session_id'] ?? '', $next]);
+        if (!isset($sent[$key]))
+        {
+            $minutes = (int)ceil(($next - $now) / 60);
+            $message = "Moulinette intermédiaire dans $minutes min.\n"
+                . "Enregistre tes fichiers. Le résultat sera disponible dans ~/traces.txt.";
+            $delivered = $graphical
+                ? persoc_exam_popup($session, $message, 'Moulinette intermédiaire')
+                : persoc_exam_console_notice($session, $message);
+            if (!$delivered)
+                continue;
+        }
+        $notices[$key] = true;
+    }
+    $sent = $notices;
+    return $deadlines;
+}
+
+function persoc_publish_exam_deadlines(array $deadlines, string $path = '/run/persoc-exam-deadlines.json'): bool
+{
+    ksort($deadlines);
+    $json = json_encode((object)$deadlines);
+    if ($json === false)
+        return false;
+    if (is_file($path) && @file_get_contents($path) === $json)
+        return true;
+    $tmp = @tempnam(dirname($path), '.persoc-exam-');
+    if ($tmp === false)
+        return false;
+    try
+    {
+        return @file_put_contents($tmp, $json) === strlen($json) && @chmod($tmp, 0644) && @rename($tmp, $path);
+    }
+    finally
+    {
+        if (is_file($tmp))
+            @unlink($tmp);
+    }
+}
+
 function users_expell_intruders(): array
 {
     global $Configuration;
@@ -217,72 +312,68 @@ function users_expell_intruders(): array
     if (!is_array($ans))
         return ["ok" => false, "error" => "is_exam: no response"];
 
-    $exam = (bool)($ans["exam"] ?? false);
+    if (($ans['result'] ?? 'ok') !== 'ok' || ($ans['status'] ?? 'ok') !== 'ok' || !is_bool($ans['exam'] ?? null))
+        return ['ok' => false, 'error' => 'is_exam: invalid room status'];
+    if (($ans['machine_verified'] ?? true) === false || (array_key_exists('room', $ans) && $ans['room'] === null))
+        return ['ok' => false, 'error' => 'is_exam: workstation is not assigned to a room'];
+
+    $exam = $ans['exam'];
     $start_at = persoc_parse_start_at($ans["start_at"] ?? null);
-
-    $sessions = persoc_list_graphical_sessions();
-
-    // Optional pre-warning: starts in <5min, and only at seconds == 00
-    $now = persoc_now();
-    $sec = (int)date("s", $now);
-
-    $warned = false;
-    if ($start_at !== null)
+    $allowed_users = $ans['allowed_users'] ?? null;
+    if ($exam && (isset($ans['session_id']) || $allowed_users !== null))
     {
-        $delta = $start_at - $now;
-        if ($delta > 0 && $delta < 300 && $sec === 0)
-        {
-            // Message to all X/Wayland users
-            // Keep simple & explicit
-            $mins = (int)ceil($delta / 60);
-            $when = date("H:i", $start_at);
-
-            $msg =
-                "⚠ EXAM imminent: début à " . $when . " (≈" . $mins . " min). "
-              . "Veuillez sauvegarder votre trail, fermer votre session et quitter la salle.";
-
-            // wall reads from stdin; avoid shell injection: use escapeshellarg
-            @system("sh -c " . escapeshellarg("printf %s " . escapeshellarg($msg . "\n") . " | wall 2>/dev/null"), $rwall);
-            $warned = true;
-        }
+        if (!is_array($allowed_users) || !array_is_list($allowed_users))
+            return ['ok' => false, 'error' => 'is_exam: missing exam roster'];
+        foreach ($allowed_users as $account)
+            if (!is_string($account) || !persoc_is_exam_account($account))
+                return ['ok' => false, 'error' => 'is_exam: invalid exam roster'];
     }
+
+    $sessions = persoc_list_exam_sessions();
+    $now = persoc_now();
+    $seconds = $start_at === null ? 0 : $start_at - $now;
+    $warned = $seconds > 0 && $seconds <= 600 && persoc_warn_exam_sessions($sessions,
+        ($ans['room'] ?? '') . ':' . ($ans['session_id'] ?? '') . ':' . $start_at, $seconds);
 
     $killed = [];
-    foreach ($sessions as $s)
+    $exam_users = [];
+    $candidate_sessions = [];
+    foreach ($sessions as $session)
     {
-        $user = (string)($s["user"] ?? "");
-        $sid  = (string)($s["sid"] ?? "");
+        $user = $session['user'];
+        $exam_account = persoc_is_exam_account($user);
+        if ($session['remote'] && !$exam_account)
+            continue;
 
-        if ($user === "") continue;
-
-        $isExamUser = persoc_is_exam_account($user);
-
-        if ($exam)
+        $close = $session['remote'] || ($exam
+            ? (!$exam_account || ($allowed_users !== null && !in_array($user, $allowed_users, true)))
+            : $exam_account);
+        if ($close)
         {
-            // exam mode: only a.b.exam allowed
-            if (!$isExamUser)
-            {
-                if (persoc_kill_graphical_session($sid, $user))
-                    $killed[] = $user;
-            }
+            if (persoc_terminate_exam_session($session))
+                $killed[] = $user;
+            else
+                persoc_log('Could not terminate exam session for ' . $user);
         }
-        else
+        if ($exam && $exam_account && !$session['remote'])
         {
-            // non-exam mode: exam accounts forbidden
-            if ($isExamUser)
-            {
-                if (persoc_kill_graphical_session($sid, $user))
-                    $killed[] = $user;
-            }
+            $exam_users[$user] = true;
+            if (!$close)
+                $candidate_sessions[] = $session;
         }
     }
 
+    $timing = is_array($ans['candidate_timing'] ?? null) ? $ans['candidate_timing'] : [];
+    if (!array_key_exists('candidate_timing', $ans) && $exam && isset($ans['end_at']))
+        $timing = array_fill_keys(array_keys($exam_users), ['end_at' => persoc_parse_start_at($ans['end_at'])]);
     return [
         "ok" => true,
         "exam" => $exam,
         "start_at" => $start_at,
         "warned" => $warned,
         "killed" => $killed,
-        "graphical_sessions" => count($sessions),
+        "graphical_sessions" => count(array_filter($sessions, 'persoc_exam_graphical_session')),
+        "exam_users" => array_keys($exam_users),
+        "exam_deadlines" => persoc_exam_feedback($candidate_sessions, $timing, $now),
     ];
 }

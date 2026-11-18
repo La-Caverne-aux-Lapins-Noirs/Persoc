@@ -2,7 +2,7 @@
 
 /**
  * Exam firewall:
- * - If $enabled === true: for users that currently have an X session, block ALL outbound traffic
+ * - If $enabled === true: for users in an interactive session, block outbound traffic
  *   except destinations listed in $Configuration['Distrans'], ['Custom'].
  * - If $enabled === false: remove the exam jump rule (disables exam filtering).
  *
@@ -15,7 +15,7 @@
  *   $Configuration['Custom'] = ["repo.school.local", ...]
  *
  */
-function firewall_exam(bool $enabled): array
+function firewall_exam(bool $enabled, ?array $exam_users = null): array
 {
     global $Configuration;
 
@@ -228,9 +228,10 @@ function firewall_exam(bool $enabled): array
         ];
     }
 
-    // ---- determine affected users (graphical only) ----
+    // The daemon supplies only local exam accounts. Ordinary SSH logins may share a UID with a local desktop.
     $graph_users = $get_graphical_usernames();
-    $uids        = $usernames_to_uids($graph_users);
+    $protected = ['root', $Configuration['LocalUser'] ?? ''];
+    $uids = $usernames_to_uids(array_diff($exam_users ?? $graph_users, $protected));
 
     // ---- allowed destination sets ----
     $allow_v4 = [];

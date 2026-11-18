@@ -276,6 +276,10 @@ function install_mock_loginctl_with_terminate(string $binDir, string $logFile, a
             "Name"  => (string)($props["Name"]  ?? ""),
             "Type"  => (string)($props["Type"]  ?? ""),
             "Class" => (string)($props["Class"] ?? ""),
+            "Display" => (string)($props["Display"] ?? ""),
+            "TTY" => (string)($props["TTY"] ?? ""),
+            "Remote" => (string)($props["Remote"] ?? ""),
+            "Service" => (string)($props["Service"] ?? ""),
         ];
     }
 
@@ -312,7 +316,7 @@ if [ "\$cmd" = "show-session" ]; then
     \$db = json_decode(getenv("MOCK_LOGINCTL_DB"), true) ?: [];
     \$sid = getenv("MOCK_SID");
     \$p = \$db[\$sid] ?? [];
-    foreach (["Name","Type","Class"] as \$k) {
+    foreach (["Name","Type","Class","Display","TTY","Remote","Service"] as \$k) {
       \$v = \$p[\$k] ?? "";
       echo \$k . "=" . \$v . "\\n";
     }

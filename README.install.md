@@ -6,7 +6,7 @@ Persoc is installed as a system service on lab machines. It is the local agent t
 - retrieves and applies the remote deadlist with nftables and a local DNS guard;
 - asks Distrans whether the current machine is in exam mode;
 - applies the exam firewall;
-- terminates graphical sessions that are not allowed in the current exam state.
+- warns users during the 10 minutes before an exam and terminates sessions that are not allowed in the current state.
 
 Persoc is not a user-facing command. It is meant to run as `root`, because it needs access to nftables, session termination and system activity information.
 
@@ -94,7 +94,13 @@ Custom = "192.168.200.1"
 
 `Custom` is an allowlist used by the exam firewall. It should contain the endpoints that must remain reachable during an exam, in addition to Distrans itself.
 
-`LocalUser` is protected by `persoc_kill_graphical_session()` and will not be killed by the intruder expulsion logic. It should be the local technical/admin user, not a student account.
+`LocalUser` is the local maintenance account and is exempt from the exam session and network policy.
+Persoc uses `loginctl` to detect graphical and student terminal sessions. It opens an `xmessage`
+dialog on Huile's X11 sessions and writes directly to local text consoles. Ordinary SSH sessions
+receive neither notices nor restrictions. Persoc terminates only the identified session, even if
+the same account is also connected remotely. During a scheduled exam, permitted local sessions use
+one of the `.exam` accounts from Distrans. A malformed response leaves the current firewall state
+in place.
 
 `Deadlist` is the local CSV file written by `get_new_deadlist()` and read by `firewall_deadlist()`. The package creates an empty `/etc/persoc/deadlist.csv` on install so that the first service start does not fail before the first successful refresh.
 
