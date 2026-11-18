@@ -817,7 +817,7 @@ function persoc_get_huile_version(): ?string
 function users_log_activity(): ?array
 {
     global $Configuration;
-    static $retry_huile_at = 0;
+    static $retry_optional_at = [];
 
     if (!isset($Configuration["Distrans"]) || !is_string($Configuration["Distrans"]) || trim($Configuration["Distrans"]) === "")
         return null;
@@ -839,18 +839,47 @@ function users_log_activity(): ?array
         "type" => persoc_get_machine_type(),
         "users" => persoc_users_get_activity(),
     ];
-    if (time() >= $retry_huile_at)
-        $packet["huile_version"] = persoc_get_huile_version();
+    $optional = ["huile_version" => persoc_get_huile_version()];
+    if (function_exists("persoc_upgrade_supported"))
+    {
+        $optional["upgrade_supported"] = persoc_upgrade_supported();
+        try
+        {
+            $optional["upgrade_status"] = persoc_upgrade_status();
+        }
+        catch (Throwable $e)
+        {
+            persoc_log("Cannot read upgrade status: " . $e->getMessage());
+        }
+    }
+    foreach ($optional as $field => $value)
+        if (time() >= ($retry_optional_at[$field] ?? 0))
+            $packet[$field] = $value;
 
     persoc_log("sending user log to distrans.", true);
-    $response = send_data($Configuration["Distrans"], $packet);
-    if (array_key_exists("huile_version", $packet)
-        && ($response["message"] ?? null) === "unexpected activity field: huile_version")
+    for ($attempt = 0; $attempt <= count($optional); ++$attempt)
     {
-        // Older Distrans rejects the unknown field before recording the sample.
-        $retry_huile_at = time() + 60;
-        unset($packet["huile_version"]);
-        return send_data($Configuration["Distrans"], $packet);
+        $response = send_data($Configuration["Distrans"], $packet);
+        $message = $response["message"] ?? "";
+        $field = is_string($message) && str_starts_with($message, "unexpected activity field: ")
+            ? substr($message, strlen("unexpected activity field: ")) : "";
+        if (!array_key_exists($field, $optional) || !array_key_exists($field, $packet))
+            break;
+        // Older Distrans rejects optional fields before recording the sample.
+        $retry_optional_at[$field] = time() + 60;
+        unset($packet[$field]);
+    }
+    if (($response["result"] ?? "") === "ok" && is_array($response["upgrade"] ?? null)
+        && function_exists("persoc_upgrade_accept"))
+    {
+        try
+        {
+            persoc_upgrade_accept($response["upgrade"]);
+        }
+        catch (Throwable $e)
+        {
+            persoc_log("Cannot accept upgrade request: " . $e->getMessage());
+        }
     }
     return $response;
 }

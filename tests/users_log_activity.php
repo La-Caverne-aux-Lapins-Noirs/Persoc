@@ -122,6 +122,26 @@ fi
 SH);
 assert_eq(with_path_prefix($bin, 'users_log_activity'), $expected, "older Distrans still receives the activity");
 
+putenv("PERSOC_LEGACY_TEST_DIR=" . $tmp);
+install_mock_cmd($bin, "ssh", <<<'SH'
+#!/bin/sh
+packet="$(cat)"
+printf '%s\n' "$packet" >> "$PERSOC_LEGACY_TEST_DIR/legacy-packets"
+if printf '%s' "$packet" | grep -q '"upgrade_supported"'; then
+    printf '%s\n' '{"status":"ko","message":"unexpected activity field: upgrade_supported"}'
+elif printf '%s' "$packet" | grep -q '"upgrade_status"'; then
+    printf '%s\n' '{"status":"ko","message":"unexpected activity field: upgrade_status"}'
+else
+    printf '%s\n' 'stored' >> "$PERSOC_LEGACY_TEST_DIR/legacy-accepted"
+    printf '%s\n' '{"ok":true,"msg":"stored"}'
+fi
+SH);
+assert_eq(with_path_prefix($bin, 'users_log_activity'), $expected, "legacy Distrans accepts activity without upgrade fields");
+assert_eq(count(file($tmp . "/legacy-accepted")), 1, "fallback records the activity exactly once");
+assert_eq(with_path_prefix($bin, 'users_log_activity'), $expected, "unsupported fields stay suppressed temporarily");
+assert_eq(count(file($tmp . "/legacy-accepted")), 2, "the next activity is still recorded once");
+putenv("PERSOC_LEGACY_TEST_DIR");
+
 rm_rf($tmp);
 fwrite(STDOUT, "OK ".basename(__FILE__)."\n");
 exit(0);

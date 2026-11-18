@@ -1,0 +1,13 @@
+[Unit]
+Description=Huile package upgrade requested through Infosphère
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/libexec/persoc-upgrade
+TimeoutStartSec=infinity
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

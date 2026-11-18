@@ -1,0 +1,15 @@
+#!/usr/bin/php
+<?php
+declare(strict_types=1);
+
+require_once '/usr/lib/persoc/tools/upgrade.php';
+
+try
+{
+    exit(persoc_upgrade_run());
+}
+catch (Throwable $e)
+{
+    fwrite(STDERR, $e->getMessage() . "\n");
+    exit(1);
+}

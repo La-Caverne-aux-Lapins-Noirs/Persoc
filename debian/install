@@ -1,5 +1,7 @@
 src/* usr/lib/persoc/
 persoc.dab etc/persoc/
 persoc usr/libexec/
+persoc-upgrade usr/libexec/
+debian/persoc-upgrade.service usr/lib/systemd/system/
 README.install.md usr/share/doc/persoc/
 README.coverage.md usr/share/doc/persoc/

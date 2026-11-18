@@ -19,11 +19,29 @@ The Debian package installs:
 - the default configuration in `/etc/persoc/persoc.dab`;
 - the configuration overlay directory `/etc/persoc/conf.d/`;
 - the systemd service `persoc.service`;
+- the on-demand worker `persoc-upgrade.service` and `/usr/libexec/persoc-upgrade`;
 - the log directory `/var/log/persoc/`;
 - an empty `/etc/persoc/deadlist.csv` if no local deadlist already exists;
 - `/root/.ssh/ihk` as an Ed25519 key if it does not already exist;
 - `/etc/persoc/ihk.pub`, a root-owned readable copy of the public key to authorize on Distrans;
 - a logrotate rule for `/var/log/persoc/persoc.log`.
+
+Infosphère can request an upgrade from its workstation inventory. Persoc receives
+the request in its next activity exchange with Distrans, normally every five
+seconds, and launches the worker. The worker runs
+`/usr/libexec/huile-auto-upgrade --force`, using Huile's installed package list.
+It keeps its request id and result in `/var/lib/persoc/upgrade.json` and reports
+them back to Distrans.
+
+The worker runs independently of the main Persoc daemon. Debian's service
+maintenance excludes this worker so updating Persoc can complete while the
+daemon restarts. The request id prevents repeating a completed operation when an
+acknowledgement is lost. An unstarted request expires after fifteen minutes.
+
+Install the updated Persoc package on each workstation once before using this
+action. Publish the updated Huile package as well so a simultaneous upgrade
+returns a temporary failure instead of reporting completion. The worker output
+is available with `journalctl -u persoc-upgrade.service`.
 
 With debhelper/systemd integration, `persoc.service` is installed as a normal system service. On a systemd machine, it can be managed with:
 

@@ -1,3 +1,7 @@
 #!/usr/bin/make -f
 %:
 	dh $@
+
+# The upgrade worker must survive upgrades of Persoc itself.
+override_dh_installsystemd:
+	dh_installsystemd --exclude=persoc-upgrade.service
